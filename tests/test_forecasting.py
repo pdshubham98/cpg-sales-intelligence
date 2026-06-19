@@ -91,3 +91,21 @@ class TestForecastEdgeCases:
         results = forecast("region", periods=3)
         for r in results:
             assert r.model_note != ""
+
+    def test_model_note_mentions_seasonal(self, forecast_env):
+        from src.forecasting.model import forecast
+        results = forecast("region", periods=3)
+        for r in results:
+            if r.predictions:
+                assert "seasonal" in r.model_note.lower()
+
+    def test_seasonal_features_helper(self):
+        from src.forecasting.model import _seasonal_features
+        import math
+        # Month 1 (Jan): sin should be positive, cos should be near 1
+        jan = _seasonal_features(1)
+        assert len(jan) == 2
+        assert abs(jan[0] - math.sin(2 * math.pi / 12)) < 1e-9
+        # Month 7 (Jul) should be opposite phase to Month 1
+        jul = _seasonal_features(7)
+        assert jan[0] * jul[0] < 0  # opposite sign on sin

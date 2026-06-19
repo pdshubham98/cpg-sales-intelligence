@@ -1,9 +1,11 @@
 """
-Revenue forecasting using monthly-aggregated linear regression.
-Supports forecasting by region or by product category.
+Revenue forecasting using monthly-aggregated linear regression with seasonal features.
+Features: period_index (trend) + sin/cos of month-of-year (seasonality).
+Supports forecasting by region, product category, or product.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -76,7 +78,20 @@ def _load_monthly_revenue(
     months = sorted(df["month"].unique())
     month_index = {m: i for i, m in enumerate(months)}
     df["period_index"] = df["month"].map(month_index)
+
+    # Cyclical seasonal features: sin/cos of month-of-year so Dec→Jan wraps correctly
+    df["month_num"] = pd.to_datetime(df["month"] + "-01").dt.month
+    df["month_sin"] = df["month_num"].apply(lambda m: math.sin(2 * math.pi * m / 12))
+    df["month_cos"] = df["month_num"].apply(lambda m: math.cos(2 * math.pi * m / 12))
     return df
+
+
+def _seasonal_features(month_num: int) -> list[float]:
+    """Return [sin, cos] cyclical encoding for a calendar month (1–12)."""
+    return [
+        math.sin(2 * math.pi * month_num / 12),
+        math.cos(2 * math.pi * month_num / 12),
+    ]
 
 
 def _forecast_one(
@@ -85,10 +100,12 @@ def _forecast_one(
     min_cv_samples: int = 3,
 ) -> tuple[list[dict], list[dict], float | None]:
     """
-    Fit LinearRegression on (period_index → revenue) for one dimension group.
+    Fit LinearRegression on (period_index, month_sin, month_cos → revenue).
+    Seasonal features capture within-year patterns; period_index captures trend.
     Returns (predictions_list, historical_list, r2_cv).
     """
-    X = group["period_index"].values.reshape(-1, 1)
+    feature_cols = ["period_index", "month_sin", "month_cos"]
+    X = group[feature_cols].values
     y = group["revenue"].values
 
     # Historical actuals for overlay chart
@@ -114,9 +131,12 @@ def _forecast_one(
 
     predictions = []
     for i in range(1, periods_ahead + 1):
+        future_dt = last_dt + pd.DateOffset(months=i)
         future_period = last_period + i
-        future_month = (last_dt + pd.DateOffset(months=i)).strftime("%Y-%m")
-        predicted_revenue = float(model.predict([[future_period]])[0])
+        future_month = future_dt.strftime("%Y-%m")
+        sin_cos = _seasonal_features(future_dt.month)
+        features = [[future_period] + sin_cos]
+        predicted_revenue = float(model.predict(features)[0])
         predictions.append(
             {
                 "month": future_month,
@@ -171,7 +191,7 @@ def forecast(
             continue
 
         predictions, historical, r2_cv = _forecast_one(group.copy(), periods)
-        note = f"Linear regression on {len(group)} monthly data points"
+        note = f"Linear regression + seasonal features on {len(group)} monthly data points"
         if r2_cv is not None:
             note += f"; CV R²={r2_cv:.3f}"
 

@@ -6,7 +6,6 @@ import textwrap
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 
@@ -41,7 +40,10 @@ def patched_env(tmp_path):
 
 
 def _write_sales(raw_dir: Path, rows: str) -> None:
-    header = "transaction_id,date,region_id,product_id,sku,quantity,unit_price,discount_pct,channel\n"
+    header = (
+        "transaction_id,date,region_id,product_id,sku,"
+        "quantity,unit_price,discount_pct,channel\n"
+    )
     (raw_dir / "sales_transactions.csv").write_text(header + rows)
 
 

@@ -2,10 +2,7 @@
 API integration tests using FastAPI TestClient.
 LLM calls are mocked; DB is a seeded temp SQLite file.
 """
-import os
 from unittest.mock import patch
-
-import pytest
 
 
 class TestHealthEndpoint:
@@ -32,7 +29,10 @@ class TestSalesSummaryEndpoint:
     def test_has_expected_keys(self, api_client):
         resp = api_client.get("/sales-summary")
         data = resp.json()
-        for key in ("total_revenue", "total_transactions", "by_region", "by_category", "monthly_trend"):
+        expected = (
+            "total_revenue", "total_transactions", "by_region", "by_category", "monthly_trend"
+        )
+        for key in expected:
             assert key in data
 
     def test_total_revenue_is_positive(self, api_client):
@@ -98,14 +98,18 @@ class TestAskEndpoint:
         assert resp.status_code == 400
 
     def test_missing_api_key_returns_503(self, api_client):
-        with patch("src.api.routes.ask.ask_question", side_effect=ValueError("GROQ_API_KEY environment variable is not set.")):
+        err = ValueError("GROQ_API_KEY environment variable is not set.")
+        with patch("src.api.routes.ask.ask_question", side_effect=err):
             resp = api_client.post("/ask", json={"question": "test"})
         assert resp.status_code == 503
 
 
 class TestInsightsEndpoint:
     def test_returns_list_of_insights(self, api_client):
-        insights = ["Expand North America.", "Reduce costs.", "Focus on Beverages.", "Invest in Q4.", "Monitor HPC."]
+        insights = [
+            "Expand North America.", "Reduce costs.", "Focus on Beverages.",
+            "Invest in Q4.", "Monitor HPC.",
+        ]
         with patch("src.api.routes.ask.generate_insights", return_value=insights):
             resp = api_client.post("/insights", json={})
         assert resp.status_code == 200
@@ -114,7 +118,8 @@ class TestInsightsEndpoint:
         assert len(data["insights"]) == 5
 
     def test_missing_api_key_returns_503(self, api_client):
-        with patch("src.api.routes.ask.generate_insights", side_effect=ValueError("GROQ_API_KEY environment variable is not set.")):
+        err = ValueError("GROQ_API_KEY environment variable is not set.")
+        with patch("src.api.routes.ask.generate_insights", side_effect=err):
             resp = api_client.post("/insights", json={})
         assert resp.status_code == 503
 
@@ -127,6 +132,7 @@ class TestTrendsEndpoint:
         assert resp.json()["summary"] == "Revenue is growing."
 
     def test_missing_api_key_returns_503(self, api_client):
-        with patch("src.api.routes.ask.summarize_trends", side_effect=ValueError("GROQ_API_KEY environment variable is not set.")):
+        err = ValueError("GROQ_API_KEY environment variable is not set.")
+        with patch("src.api.routes.ask.summarize_trends", side_effect=err):
             resp = api_client.get("/trends")
         assert resp.status_code == 503

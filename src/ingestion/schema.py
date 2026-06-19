@@ -2,6 +2,7 @@ import sqlite3
 import os
 from pathlib import Path
 
+
 def get_connection() -> sqlite3.Connection:
     # Read DB_PATH at call time so tests can patch it via os.environ.
     db_path = Path(os.getenv("DB_PATH", "db/sales.db"))

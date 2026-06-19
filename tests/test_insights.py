@@ -3,7 +3,7 @@ Unit tests for the LLM insights layer.
 All LLM calls are mocked — no API key required.
 """
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -93,7 +93,10 @@ class TestAskQuestion:
 
 class TestGenerateInsights:
     def test_returns_list(self):
-        raw = "1. Expand North America.\n2. Reduce Snacks inventory.\n3. Focus on Beverages.\n4. Invest in digital.\n5. Monitor Q4."
+        raw = (
+            "1. Expand North America.\n2. Reduce Snacks inventory.\n"
+            "3. Focus on Beverages.\n4. Invest in digital.\n5. Monitor Q4."
+        )
         with patch("src.insights.llm._call_llm", return_value=raw):
             from src.insights.llm import generate_insights
             result = generate_insights(MOCK_SUMMARY)

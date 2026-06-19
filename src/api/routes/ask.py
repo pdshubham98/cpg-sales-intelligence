@@ -63,7 +63,7 @@ def ask_data(req: AskRequest):
     Natural language Q&A against the sales data.
 
     Example request:  {"question": "Which region has the highest revenue?"}
-    Example response: {"question": "...", "answer": "Region R001 (North America) leads with $28,000."}
+    Example response: {"question": "...", "answer": "Region R001 leads with $28,000."}
     """
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question must not be empty.")

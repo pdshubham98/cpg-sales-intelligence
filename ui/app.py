@@ -47,6 +47,17 @@ def _escape_md(text: str) -> str:
     return text.replace("$", r"\$")
 
 
+def _csv_btn(df: pd.DataFrame, filename: str, label: str = "Download CSV"):
+    """Render a small download button for a DataFrame."""
+    st.download_button(
+        label=label,
+        data=df.to_csv(index=False).encode("utf-8"),
+        file_name=filename,
+        mime="text/csv",
+        use_container_width=False,
+    )
+
+
 # ── Chat session helpers ──────────────────────────────────────────────────────
 
 def _create_session() -> str:
@@ -137,6 +148,7 @@ if page == "Overview":
             )
             fig.update_layout(xaxis_tickangle=-20)
             st.plotly_chart(fig, use_container_width=True)
+            _csv_btn(df_region, "revenue_by_region.csv")
 
     with col_right:
         st.subheader("Revenue by Category")
@@ -147,6 +159,7 @@ if page == "Overview":
                 hole=0.4,
             )
             st.plotly_chart(fig, use_container_width=True)
+            _csv_btn(df_cat, "revenue_by_category.csv")
 
     st.subheader("Monthly Revenue Trend")
     df_monthly = pd.DataFrame(data["monthly_trend"])
@@ -157,6 +170,7 @@ if page == "Overview":
             labels={"month": "Month", "revenue": "Revenue ($)"},
         )
         st.plotly_chart(fig, use_container_width=True)
+        _csv_btn(df_monthly, "monthly_revenue.csv")
 
     st.subheader("Revenue by Channel")
     df_channel = pd.DataFrame(data["by_channel"])
@@ -168,6 +182,7 @@ if page == "Overview":
             text_auto=".2s",
         )
         st.plotly_chart(fig, use_container_width=True)
+        _csv_btn(df_channel, "revenue_by_channel.csv")
 
     st.markdown("---")
     st.subheader("Top Products by Revenue")
@@ -182,6 +197,7 @@ if page == "Overview":
         )
         fig.update_layout(yaxis=dict(autorange="reversed"), height=380)
         st.plotly_chart(fig, use_container_width=True)
+        _csv_btn(df_prod, "top_products.csv")
 
 # ── Page: Forecasting ─────────────────────────────────────────────────────────
 elif page == "Forecasting":
@@ -256,6 +272,16 @@ elif page == "Forecasting":
                         hovermode="x unified",
                     )
                     st.plotly_chart(fig, use_container_width=True)
+                    df_export = pd.DataFrame(
+                        [{"month": r["month"], "revenue": r["revenue"], "type": "historical"}
+                         for r in hist]
+                        + [{"month": r["month"], "revenue": r["revenue"], "type": "forecast"}
+                           for r in preds]
+                    )
+                    _csv_btn(
+                        df_export,
+                        f"forecast_{result['dimension'].replace(' ', '_')}.csv",
+                    )
                 else:
                     st.warning("Insufficient data for forecast.")
         else:

@@ -9,10 +9,10 @@ AI-powered analytics platform for CPG revenue forecasting, data quality validati
 | API | FastAPI + Uvicorn |
 | UI | Streamlit (4-page dashboard) |
 | Storage | SQLite (WAL mode) |
-| Ingestion | Pandas + 8 quality rules |
-| Forecasting | scikit-learn LinearRegression |
+| Ingestion | Pandas + multi-source adapter pattern + 9 quality rules |
+| Forecasting | scikit-learn LinearRegression with cyclical seasonal features |
 | LLM | Groq `llama-3.3-70b-versatile` (primary) / Gemini `gemini-1.5-flash` (fallback) |
-| Tests | pytest — 52 tests, all mocked |
+| Tests | pytest — 60 tests, all mocked |
 | CI/CD | GitHub Actions (lint → test → Docker build) |
 | Container | Docker + docker-compose |
 
@@ -58,10 +58,11 @@ Both services start automatically. No other setup required.
 |---|---|---|
 | GET | `/health` | Service health + DB row counts |
 | GET | `/sales-summary` | Aggregated KPIs by region, category, channel, month |
-| POST | `/forecast` | Revenue forecast by region or category |
-| POST | `/ask` | Natural language Q&A against sales data |
+| POST | `/forecast` | Revenue forecast by region, category, or product |
+| POST | `/ask` | Natural language Q&A against sales data + industry benchmarks |
 | POST | `/insights` | 5 actionable AI-generated business insights |
 | GET | `/trends` | LLM-generated trend summary |
+| GET | `/market-benchmarks` | Live quarterly revenue for major CPG companies (Yahoo Finance) |
 
 ### POST /forecast — example
 
@@ -104,14 +105,15 @@ Get a free Groq key at https://console.groq.com
 
 ```
 cpg-sales-intelligence/
-├── data/raw/          # Source CSVs (sales, products, regions)
+├── data/raw/          # Source CSVs: sales_transactions (POS), sales_ecommerce, products, regions
 ├── src/
-│   ├── ingestion/     # ETL loader + SQLite schema
-│   ├── forecasting/   # Linear regression model
+│   ├── ingestion/     # Multi-source ETL loader + SQLite schema
+│   ├── forecasting/   # Linear regression model with seasonal features
 │   ├── insights/      # LLM layer (Groq / Gemini)
+│   ├── market/        # Live industry benchmarks via Yahoo Finance
 │   └── api/           # FastAPI app + routes
-├── ui/                # Streamlit dashboard
-├── tests/             # 52 pytest tests
+├── ui/                # Streamlit dashboard (Overview, Forecasting, Sales Assistant, AI Insights)
+├── tests/             # 60 pytest tests
 ├── docs/              # Architecture diagram, ADR, video script
 └── .github/workflows/ # GitHub Actions CI
 ```

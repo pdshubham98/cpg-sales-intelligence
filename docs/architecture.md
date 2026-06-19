@@ -41,13 +41,14 @@
 
 | Component | File(s) | Responsibility |
 |---|---|---|
-| ETL Ingestion | `src/ingestion/loader.py` | Load CSVs, apply 8 quality rules, write to SQLite |
+| ETL Ingestion | `src/ingestion/loader.py` | Multi-source adapter pattern; 9 quality rules; EUR→USD normalisation; late-arriving detection |
 | DB Schema | `src/ingestion/schema.py` | SQLite DDL, `get_connection()` |
-| Forecasting | `src/forecasting/model.py` | Monthly-aggregate linear regression by region/category |
+| Forecasting | `src/forecasting/model.py` | Linear regression with cyclical seasonal features (sin/cos month) by region/category/product |
 | LLM Layer | `src/insights/llm.py` | Groq/Gemini routing, trend summary, Q&A, insights |
-| FastAPI | `src/api/main.py` + `routes/` | REST API with 6 endpoints |
-| Streamlit UI | `ui/app.py` | 4-page dashboard: Overview, Forecasting, Ask Data, AI Insights |
-| Tests | `tests/` | 52 pytest tests, all mocked |
+| Market Data | `src/market/benchmarks.py` | Live quarterly revenue for major CPG companies via Yahoo Finance |
+| FastAPI | `src/api/main.py` + `routes/` | REST API with 7 endpoints |
+| Streamlit UI | `ui/app.py` | 4-page dashboard: Overview, Forecasting, Sales Assistant, AI Insights |
+| Tests | `tests/` | 60 pytest tests, all mocked |
 | CI | `.github/workflows/ci.yml` | Lint → test → Docker build + smoke test |
 
 ## Data Flow
@@ -62,8 +63,11 @@
 
 | What to extend | Current | Next step |
 |---|---|---|
+| Add a new data source | Two CSV sources with adapter pattern | Add entry to `_SOURCE_REGISTRY` in `loader.py` with a new adapter function |
 | Scale data processing | pandas | Replace `loader.py` with PySpark; same quality rules, distributed execution |
 | Scale storage | SQLite | Replace `get_connection()` with PostgreSQL (`psycopg2`); schema is compatible |
 | LLM provider | Groq / Gemini | Add case to `_call_llm()` in `llm.py`; one `LLM_PROVIDER` env var change |
-| Forecasting model | LinearRegression | Replace `model.py` with Prophet or XGBoost; same interface |
+| Forecasting model | LinearRegression + seasonal features | Replace `model.py` with Prophet or XGBoost; same interface |
+| Currency conversion | Fixed EUR→USD rate in `loader.py` | Replace `_EUR_TO_USD` constant with a live FX API call |
+| Market benchmarks | Yahoo Finance via yfinance | Swap `get_quarterly_revenue()` for any financial data provider |
 | Deployment | Docker single-host | Push image to ECR + deploy to ECS or Kubernetes |

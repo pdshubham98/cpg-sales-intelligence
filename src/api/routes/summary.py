@@ -74,6 +74,16 @@ def sales_summary():
                 ORDER BY revenue DESC
             """).fetchall()
 
+            # Discount analysis by channel
+            discount = conn.execute("""
+                SELECT channel,
+                       ROUND(AVG(discount_pct) * 100, 2)          AS avg_discount_pct,
+                       ROUND(SUM(quantity * unit_price * discount_pct), 2) AS revenue_foregone
+                FROM sales_transactions
+                GROUP BY channel
+                ORDER BY revenue_foregone DESC
+            """).fetchall()
+
             # Month-over-month: last two complete months in the dataset
             last_two = conn.execute("""
                 SELECT strftime('%Y-%m', date) AS month,
@@ -111,6 +121,7 @@ def sales_summary():
             "monthly_trend": [dict(r) for r in monthly],
             "by_product": [dict(r) for r in by_product],
             "mom_delta": mom,
+            "discount_analysis": [dict(r) for r in discount],
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

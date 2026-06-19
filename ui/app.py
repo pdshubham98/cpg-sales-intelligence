@@ -199,6 +199,31 @@ if page == "Overview":
         st.plotly_chart(fig, use_container_width=True)
         _csv_btn(df_prod, "top_products.csv")
 
+    # Discount analysis
+    df_discount = pd.DataFrame(data.get("discount_analysis", []))
+    if not df_discount.empty:
+        st.markdown("---")
+        st.subheader("Discount Analysis by Channel")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            fig = px.bar(
+                df_discount, x="channel", y="avg_discount_pct",
+                labels={"channel": "Channel", "avg_discount_pct": "Avg Discount (%)"},
+                color="channel", text_auto=".1f",
+                title="Average Discount %",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with col_d2:
+            fig = px.bar(
+                df_discount, x="channel", y="revenue_foregone",
+                labels={"channel": "Channel", "revenue_foregone": "Revenue Foregone ($)"},
+                color="channel", text_auto=".2s",
+                title="Revenue Foregone to Discounts",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        _csv_btn(df_discount, "discount_analysis.csv")
+
     # Data quality report
     st.markdown("---")
     with st.expander("Data Quality Report", expanded=False):

@@ -255,8 +255,24 @@ elif page == "Ask Data":
             else:
                 st.markdown(msg["content"])
 
+    # Suggested questions — shown only when the conversation is empty
+    _SUGGESTED = [
+        "Which region has the highest revenue?",
+        "What are the top 3 products by sales?",
+        "Which channel drives the most transactions?",
+        "How has monthly revenue trended this year?",
+    ]
+    _quick_fire: str | None = None
+    if not history:
+        st.markdown("**Try asking:**")
+        _cols = st.columns(len(_SUGGESTED))
+        for _col, _q in zip(_cols, _SUGGESTED):
+            with _col:
+                if st.button(_q, use_container_width=True, key=f"suggest_{_q[:20]}"):
+                    _quick_fire = _q
+
     # Chat input — sticks to the bottom
-    user_input = st.chat_input("Ask a question about your sales data…")
+    user_input = st.chat_input("Ask a question about your sales data…") or _quick_fire
 
     if user_input and user_input.strip():
         with st.chat_message("user"):

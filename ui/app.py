@@ -99,9 +99,22 @@ if page == "Overview":
     if not data:
         st.stop()
 
+    mom = data.get("mom_delta", {})
+    _rev_pct = mom.get("revenue_delta_pct")
+    _tx_pct = mom.get("transactions_delta_pct")
+    _mom_label = (
+        f"vs {mom['prev_month']}" if mom.get("prev_month") else ""
+    )
+
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Revenue", f"${data['total_revenue']:,.2f}")
-    col2.metric("Total Transactions", f"{data['total_transactions']:,}")
+    col1.metric(
+        "Total Revenue", f"${data['total_revenue']:,.2f}",
+        delta=f"{_rev_pct:+.1f}% MoM {_mom_label}" if _rev_pct is not None else None,
+    )
+    col2.metric(
+        "Total Transactions", f"{data['total_transactions']:,}",
+        delta=f"{_tx_pct:+.1f}% MoM {_mom_label}" if _tx_pct is not None else None,
+    )
     avg = (
         data["total_revenue"] / data["total_transactions"]
         if data["total_transactions"] else 0

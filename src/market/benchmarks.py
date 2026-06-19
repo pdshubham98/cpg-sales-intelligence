@@ -5,7 +5,6 @@ Revenue values are in USD millions for display comparability.
 from __future__ import annotations
 
 import logging
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +23,8 @@ def get_quarterly_revenue() -> list[dict]:
     Return last 4 quarters of total revenue for each CPG company.
     Each record: {company, ticker, quarter, revenue_m}
     """
+    import yfinance as yf  # lazy import — optional dependency
+
     records = []
     for ticker, name in CPG_TICKERS.items():
         try:

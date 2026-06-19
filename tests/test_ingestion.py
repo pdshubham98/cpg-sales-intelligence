@@ -173,3 +173,90 @@ class TestRevenueDerivation:
             ).fetchone()
         # 100 * 2.00 * (1 - 0.10) = 180.00
         assert row["revenue"] == pytest.approx(180.00, rel=1e-4)
+
+
+class TestMultiSourceIngestion:
+    def _write_ecommerce(self, raw_dir: Path, rows: str) -> None:
+        header = (
+            "order_id,order_date,region_code,product_code,sku_ref,"
+            "qty,unit_price_eur,promo_pct,channel,currency,customer_segment\n"
+        )
+        (raw_dir / "sales_ecommerce.csv").write_text(header + rows)
+
+    def test_both_sources_merged(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        self._write_ecommerce(
+            raw_dir,
+            "WEB001,01/15/2024,R001,P001,BEV-001,5,1.83,0.0,E-Commerce,EUR,standard\n",
+        )
+        from src.ingestion.loader import run_ingestion
+        result = run_ingestion()
+        assert result["clean_rows"] == 2
+        assert result["sources"]["POS"]["clean"] == 1
+        assert result["sources"]["E-Commerce"]["clean"] == 1
+
+    def test_ecommerce_currency_converted(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "")
+        self._write_ecommerce(
+            raw_dir,
+            "WEB001,01/15/2024,R001,P001,BEV-001,10,2.00,0.0,E-Commerce,EUR,standard\n",
+        )
+        from src.ingestion.loader import run_ingestion, _EUR_TO_USD
+        from src.ingestion.schema import get_connection
+        result = run_ingestion()
+        assert result["currency_conversions"] == 1
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT unit_price FROM sales_transactions WHERE transaction_id='WEB001'"
+            ).fetchone()
+        assert row["unit_price"] == pytest.approx(2.00 * _EUR_TO_USD, rel=1e-4)
+
+    def test_ecommerce_date_format_normalised(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "")
+        self._write_ecommerce(
+            raw_dir,
+            "WEB001,03/15/2024,R001,P001,BEV-001,10,1.83,0.0,E-Commerce,EUR,standard\n",
+        )
+        from src.ingestion.loader import run_ingestion
+        from src.ingestion.schema import get_connection
+        run_ingestion()
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT date FROM sales_transactions WHERE transaction_id='WEB001'"
+            ).fetchone()
+        assert row["date"] == "2024-03-15"
+
+    def test_cross_source_deduplication(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        self._write_ecommerce(
+            raw_dir,
+            "T001,01/01/2024,R001,P001,BEV-001,10,1.83,0.0,E-Commerce,EUR,standard\n",
+        )
+        from src.ingestion.loader import run_ingestion
+        result = run_ingestion()
+        assert result["clean_rows"] == 1
+        assert "duplicate transaction_id" in result["quality_issues"]
+
+    def test_late_arriving_rows_detected(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        # Most recent record is Dec 2024; include one from Jan 2024 (late-arriving)
+        _write_sales(
+            raw_dir,
+            "T001,2024-12-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n"
+            "T002,2024-01-01,R001,P001,BEV-001,5,1.99,0.0,Retail\n",
+        )
+        from src.ingestion.loader import run_ingestion
+        result = run_ingestion()
+        assert result["late_arriving_rows"] >= 1
+
+    def test_missing_ecommerce_source_is_skipped(self, patched_env):
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        # No ecommerce file — should not raise
+        from src.ingestion.loader import run_ingestion
+        result = run_ingestion()
+        assert result["clean_rows"] == 1

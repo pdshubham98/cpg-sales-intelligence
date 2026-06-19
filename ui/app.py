@@ -283,6 +283,21 @@ if page == "Overview":
             c1.metric("Raw Rows Ingested", dq.get("raw_rows", "—"))
             c2.metric("Clean Rows Loaded", dq.get("clean_rows", "—"))
             c3.metric("Rows Dropped", dq.get("dropped_rows", "—"))
+
+            sources = dq.get("sources", {})
+            if sources:
+                st.markdown("**Sources ingested:**")
+                for src, counts in sources.items():
+                    st.markdown(
+                        f"- **{src}**: {counts.get('raw', 0)} raw → "
+                        f"{counts.get('clean', 0)} clean"
+                    )
+
+            st.markdown(
+                f"**Currency conversions (EUR→USD):** {dq.get('currency_conversions', 0)}  \n"
+                f"**Late-arriving rows flagged:** {dq.get('late_arriving_rows', 0)}"
+            )
+
             issues = dq.get("quality_issues", {})
             if issues:
                 st.markdown("**Quality rules applied:**")

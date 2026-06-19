@@ -9,9 +9,9 @@ router = APIRouter(tags=["forecasting"])
 
 
 class ForecastRequest(BaseModel):
-    dimension_type: Literal["region", "category"] = Field(
+    dimension_type: Literal["region", "category", "product"] = Field(
         default="region",
-        description="Forecast by 'region' or 'category'",
+        description="Forecast by 'region', 'category', or 'product'",
     )
     dimension_value: Optional[str] = Field(
         default=None,

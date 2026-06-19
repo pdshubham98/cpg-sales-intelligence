@@ -304,18 +304,24 @@ elif page == "Forecasting":
     }
     _category_options = [c["category"] for c in _summary.get("by_category", [])]
 
+    _product_options = [p["product_name"] for p in _summary.get("by_product", [])]
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        dim_type = st.selectbox("Forecast by", ["region", "category"])
+        dim_type = st.selectbox("Forecast by", ["region", "category", "product"])
     with col2:
         if dim_type == "region":
             _region_choices = ["All regions"] + list(_region_options.keys())
             _sel_region = st.selectbox("Region", _region_choices)
             dim_val = None if _sel_region == "All regions" else _region_options[_sel_region]
-        else:
+        elif dim_type == "category":
             _cat_choices = ["All categories"] + _category_options
             _sel_cat = st.selectbox("Category", _cat_choices)
             dim_val = None if _sel_cat == "All categories" else _sel_cat
+        else:
+            _prod_choices = ["All products"] + _product_options
+            _sel_prod = st.selectbox("Product", _prod_choices)
+            dim_val = None if _sel_prod == "All products" else _sel_prod
     with col3:
         periods = st.slider("Months ahead", 1, 12, 3)
 

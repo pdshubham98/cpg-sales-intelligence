@@ -26,7 +26,9 @@ class ForecastResult:
     model_note: str
 
 
-def _load_monthly_revenue(dimension_type: Literal["region", "category"]) -> pd.DataFrame:
+def _load_monthly_revenue(
+    dimension_type: Literal["region", "category", "product"]
+) -> pd.DataFrame:
     """
     Query SQLite and return monthly revenue aggregated by the chosen dimension.
     Returns columns: [period_index, dimension, revenue]
@@ -41,7 +43,7 @@ def _load_monthly_revenue(dimension_type: Literal["region", "category"]) -> pd.D
             GROUP BY month, region_id
             ORDER BY month
         """
-    else:
+    elif dimension_type == "category":
         query = """
             SELECT
                 strftime('%Y-%m', s.date) AS month,
@@ -50,6 +52,17 @@ def _load_monthly_revenue(dimension_type: Literal["region", "category"]) -> pd.D
             FROM sales_transactions s
             JOIN products p ON s.product_id = p.product_id
             GROUP BY month, p.category
+            ORDER BY month
+        """
+    else:  # product
+        query = """
+            SELECT
+                strftime('%Y-%m', s.date) AS month,
+                p.product_name            AS dimension,
+                SUM(s.revenue)            AS revenue
+            FROM sales_transactions s
+            JOIN products p ON s.product_id = p.product_id
+            GROUP BY month, p.product_name
             ORDER BY month
         """
 
@@ -115,7 +128,7 @@ def _forecast_one(
 
 
 def forecast(
-    dimension_type: Literal["region", "category"],
+    dimension_type: Literal["region", "category", "product"],
     dimension_value: str | None = None,
     periods: int = 3,
 ) -> list[ForecastResult]:

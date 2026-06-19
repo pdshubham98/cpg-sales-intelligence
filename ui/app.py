@@ -123,8 +123,34 @@ page = st.sidebar.radio(
 
 # ── Page: Overview ────────────────────────────────────────────────────────────
 if page == "Overview":
+    import datetime as _dt
     st.title("Sales Overview")
-    data = _get("/sales-summary")
+
+    # Date range filter
+    with st.expander("Date Range Filter", expanded=False):
+        _fc1, _fc2, _fc3 = st.columns([2, 2, 1])
+        with _fc1:
+            _start = st.date_input(
+                "From", value=_dt.date(2024, 1, 1), min_value=_dt.date(2024, 1, 1),
+                key="ov_start",
+            )
+        with _fc2:
+            _end = st.date_input(
+                "To", value=_dt.date(2025, 12, 31), max_value=_dt.date(2025, 12, 31),
+                key="ov_end",
+            )
+        with _fc3:
+            st.markdown(" ")
+            if st.button("Reset", use_container_width=True):
+                st.session_state.ov_start = _dt.date(2024, 1, 1)
+                st.session_state.ov_end = _dt.date(2025, 12, 31)
+                st.rerun()
+    _params = {
+        "start_date": str(_start) if "_start" in dir() else None,
+        "end_date": str(_end) if "_end" in dir() else None,
+    }
+
+    data = _get("/sales-summary", params=_params)
     if not data:
         st.warning(
             "No data available. The API may still be starting up — "

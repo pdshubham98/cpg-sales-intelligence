@@ -199,6 +199,25 @@ if page == "Overview":
         st.plotly_chart(fig, use_container_width=True)
         _csv_btn(df_prod, "top_products.csv")
 
+    # Data quality report
+    st.markdown("---")
+    with st.expander("Data Quality Report", expanded=False):
+        dq = _get("/data-quality")
+        if dq:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Raw Rows Ingested", dq.get("raw_rows", "—"))
+            c2.metric("Clean Rows Loaded", dq.get("clean_rows", "—"))
+            c3.metric("Rows Dropped", dq.get("dropped_rows", "—"))
+            issues = dq.get("quality_issues", {})
+            if issues:
+                st.markdown("**Quality rules applied:**")
+                for rule, count in issues.items():
+                    st.markdown(f"- `{rule}`: **{count}** row(s) affected")
+            else:
+                st.success("No quality issues detected.")
+        else:
+            st.info("Quality report not yet available (API may be starting up).")
+
 # ── Page: Forecasting ─────────────────────────────────────────────────────────
 elif page == "Forecasting":
     st.title("Revenue Forecasting")

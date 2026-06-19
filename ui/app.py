@@ -48,7 +48,7 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CPG Sales Intelligence v1.0")
+st.sidebar.caption("CPG Sales Intelligence v2.0")
 
 # ── Page: Overview ────────────────────────────────────────────────────────────
 if page == "Overview":
@@ -145,25 +145,60 @@ elif page == "Forecasting":
         else:
             st.warning("No forecast results returned.")
 
-# ── Page: Ask Data ────────────────────────────────────────────────────────────
+# ── Page: Ask Data (Chat) ─────────────────────────────────────────────────────
 elif page == "Ask Data":
     st.title("Ask Data")
-    st.caption("Ask a natural language question about your sales data.")
+    st.caption("Chat with your sales data. Ask anything — the assistant remembers your conversation."  # noqa: E501
+               )
 
-    question = st.text_area(
-        "Your question",
-        placeholder="e.g. Which region has the highest revenue? What is the best-selling category?",
-        height=100,
-    )
+    # Initialise chat history in session state
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-    if st.button("Ask", type="primary") and question.strip():
-        with st.spinner("Thinking..."):
-            result = _post("/ask", {"question": question})
-        if result and "answer" in result:
-            st.markdown("### Answer")
-            st.write(result["answer"])
-        else:
-            st.error("Could not get an answer. Check your LLM API key.")
+    # Clear conversation button
+    col_title, col_clear = st.columns([5, 1])
+    with col_clear:
+        if st.button("Clear chat", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
+
+    # Render existing conversation
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Chat input — sticks to the bottom like a real chat app
+    user_input = st.chat_input("Ask a question about your sales data…")
+
+    if user_input and user_input.strip():
+        # Display and store the user message immediately
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        st.session_state.chat_history.append(
+            {"role": "user", "content": user_input}
+        )
+
+        # Call the API, passing conversation history for context
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking…"):
+                result = _post(
+                    "/ask",
+                    {
+                        "question": user_input,
+                        "history": st.session_state.chat_history[:-1],
+                    },
+                )
+            if result and "answer" in result:
+                st.markdown(result["answer"])
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": result["answer"]}
+                )
+            else:
+                error_msg = "Sorry, I could not get an answer. Please check your LLM API key."
+                st.error(error_msg)
+                st.session_state.chat_history.append(
+                    {"role": "assistant", "content": error_msg}
+                )
 
 # ── Page: AI Insights ─────────────────────────────────────────────────────────
 elif page == "AI Insights":

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -40,8 +42,14 @@ def _get_summary_context() -> dict:
     }
 
 
+class ChatMessage(BaseModel):
+    role: str   # "user" or "assistant"
+    content: str
+
+
 class AskRequest(BaseModel):
     question: str
+    history: Optional[list[ChatMessage]] = None
 
 
 class AskResponse(BaseModel):
@@ -69,7 +77,11 @@ def ask_data(req: AskRequest):
         raise HTTPException(status_code=400, detail="Question must not be empty.")
     try:
         context = _get_summary_context()
-        answer = ask_question(req.question, context)
+        history = (
+            [{"role": m.role, "content": m.content} for m in req.history]
+            if req.history else []
+        )
+        answer = ask_question(req.question, context, history=history)
         return AskResponse(question=req.question, answer=answer)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))

@@ -84,13 +84,29 @@ Provide only the analysis, no preamble."""
     return _call_llm(prompt)
 
 
-def ask_question(question: str, context: dict[str, Any]) -> str:
+def ask_question(
+    question: str,
+    context: dict[str, Any],
+    history: list[dict] | None = None,
+) -> str:
     """
     Answer a natural language question about the sales data.
+    Accepts optional conversation history to support multi-turn chat.
     """
+    history_block = ""
+    if history:
+        # Include up to the last 6 turns (3 exchanges) as context
+        recent = history[-6:]
+        lines = []
+        for msg in recent:
+            prefix = "User" if msg["role"] == "user" else "Assistant"
+            lines.append(f"{prefix}: {msg['content']}")
+        history_block = "\nConversation so far:\n" + "\n".join(lines) + "\n"
+
     prompt = f"""You are a CPG sales data analyst assistant. Answer the following
 question using only the provided sales data context. Be concise and specific.
-
+If the question references something from the conversation history, use that context.
+{history_block}
 Sales Data Context:
 {context}
 

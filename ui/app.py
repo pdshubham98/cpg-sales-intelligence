@@ -11,6 +11,7 @@ import requests
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
 
@@ -192,14 +193,39 @@ elif page == "Forecasting":
         if isinstance(results, list) and results:
             for result in results:
                 st.subheader(f"{result['dimension']} ({result['dimension_type']})")
-                st.caption(result["model_note"])
-                if result["predictions"]:
-                    df = pd.DataFrame(result["predictions"])
-                    fig = px.bar(
-                        df, x="month", y="revenue",
-                        labels={"month": "Month", "revenue": "Predicted Revenue ($)"},
-                        color_discrete_sequence=["#2563EB"],
-                        text_auto=".2s",
+                r2 = result.get("r2_cv")
+                quality = (
+                    f"Model fit: R² = {r2:.3f} "
+                    + ("(good)" if r2 and r2 >= 0.7 else "(low — interpret with caution)")
+                    if r2 is not None else "Model fit: insufficient data for R²"
+                )
+                st.caption(f"{result['model_note']}  |  {quality}")
+
+                hist = result.get("historical", [])
+                preds = result.get("predictions", [])
+
+                if preds:
+                    fig = go.Figure()
+                    if hist:
+                        df_h = pd.DataFrame(hist)
+                        fig.add_trace(go.Bar(
+                            x=df_h["month"], y=df_h["revenue"],
+                            name="Historical",
+                            marker_color="#94A3B8",
+                        ))
+                    df_p = pd.DataFrame(preds)
+                    fig.add_trace(go.Scatter(
+                        x=df_p["month"], y=df_p["revenue"],
+                        mode="lines+markers",
+                        name="Forecast",
+                        line=dict(color="#2563EB", dash="dash", width=2),
+                        marker=dict(size=8),
+                    ))
+                    fig.update_layout(
+                        xaxis_title="Month",
+                        yaxis_title="Revenue ($)",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+                        hovermode="x unified",
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:

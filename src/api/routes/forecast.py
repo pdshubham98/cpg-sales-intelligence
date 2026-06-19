@@ -30,6 +30,7 @@ class ForecastResponse(BaseModel):
     dimension_type: str
     periods: int
     predictions: list[dict]
+    historical: list[dict]
     r2_cv: Optional[float]
     model_note: str
 
@@ -65,6 +66,7 @@ def run_forecast(req: ForecastRequest):
             dimension_type=r.dimension_type,
             periods=r.periods,
             predictions=r.predictions,
+            historical=r.historical,
             r2_cv=r.r2_cv,
             model_note=r.model_note,
         )

@@ -21,6 +21,7 @@ class ForecastResult:
     dimension_type: str     # "region" or "category"
     periods: int
     predictions: list[dict]  # [{month: "YYYY-MM", revenue: float}]
+    historical: list[dict]   # [{month: "YYYY-MM", revenue: float}]
     r2_cv: float | None
     model_note: str
 
@@ -69,13 +70,19 @@ def _forecast_one(
     group: pd.DataFrame,
     periods_ahead: int,
     min_cv_samples: int = 3,
-) -> tuple[list[dict], float | None]:
+) -> tuple[list[dict], list[dict], float | None]:
     """
     Fit LinearRegression on (period_index → revenue) for one dimension group.
-    Returns (predictions_list, r2_cv).
+    Returns (predictions_list, historical_list, r2_cv).
     """
     X = group["period_index"].values.reshape(-1, 1)
     y = group["revenue"].values
+
+    # Historical actuals for overlay chart
+    historical = [
+        {"month": row["month"], "revenue": round(float(row["revenue"]), 2)}
+        for _, row in group.sort_values("month").iterrows()
+    ]
 
     model = LinearRegression()
     model.fit(X, y)
@@ -104,7 +111,7 @@ def _forecast_one(
             }
         )
 
-    return predictions, r2_cv
+    return predictions, historical, r2_cv
 
 
 def forecast(
@@ -143,13 +150,14 @@ def forecast(
                     dimension_type=dimension_type,
                     periods=periods,
                     predictions=[],
+                    historical=[],
                     r2_cv=None,
                     model_note="Insufficient data (< 2 months)",
                 )
             )
             continue
 
-        predictions, r2_cv = _forecast_one(group.copy(), periods)
+        predictions, historical, r2_cv = _forecast_one(group.copy(), periods)
         note = f"Linear regression on {len(group)} monthly data points"
         if r2_cv is not None:
             note += f"; CV R²={r2_cv:.3f}"
@@ -160,6 +168,7 @@ def forecast(
                 dimension_type=dimension_type,
                 periods=periods,
                 predictions=predictions,
+                historical=historical,
                 r2_cv=r2_cv,
                 model_note=note,
             )

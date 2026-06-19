@@ -116,10 +116,12 @@ if page == "Overview":
         df_region = pd.DataFrame(data["by_region"])
         if not df_region.empty:
             fig = px.bar(
-                df_region, x="region_id", y="revenue",
-                labels={"region_id": "Region", "revenue": "Revenue ($)"},
+                df_region, x="region_name", y="revenue",
+                labels={"region_name": "Region", "revenue": "Revenue ($)"},
                 color="revenue", color_continuous_scale="Blues",
+                text_auto=".2s",
             )
+            fig.update_layout(xaxis_tickangle=-20)
             st.plotly_chart(fig, use_container_width=True)
 
     with col_right:

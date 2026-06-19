@@ -26,11 +26,13 @@ def sales_summary():
             ).fetchone()
 
             by_region = conn.execute("""
-                SELECT region_id,
-                       ROUND(SUM(revenue), 2) AS revenue,
+                SELECT s.region_id,
+                       COALESCE(r.region_name, s.region_id) AS region_name,
+                       ROUND(SUM(s.revenue), 2) AS revenue,
                        COUNT(*) AS transactions
-                FROM sales_transactions
-                GROUP BY region_id
+                FROM sales_transactions s
+                LEFT JOIN regions r ON s.region_id = r.region_id
+                GROUP BY s.region_id, r.region_name
                 ORDER BY revenue DESC
             """).fetchall()
 

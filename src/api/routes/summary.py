@@ -1,34 +1,35 @@
 from typing import Optional
+from datetime import date as Date
 from fastapi import APIRouter, HTTPException, Query
 from src.ingestion.schema import get_connection
 
 router = APIRouter(tags=["analytics"])
 
 
-def _date_filter(col: str, start: Optional[str], end: Optional[str]) -> str:
-    """Build a WHERE clause fragment for a date column. Inputs must be YYYY-MM-DD."""
+def _date_filter(col: str, start: Optional[Date], end: Optional[Date]) -> str:
+    """Build a WHERE clause fragment for a date column."""
     parts = []
     if start:
-        parts.append(f"{col} >= '{start}'")
+        parts.append(f"{col} >= '{start.isoformat()}'")
     if end:
-        parts.append(f"{col} <= '{end}'")
+        parts.append(f"{col} <= '{end.isoformat()}'")
     return ("WHERE " + " AND ".join(parts)) if parts else ""
 
 
-def _date_and(col: str, start: Optional[str], end: Optional[str]) -> str:
+def _date_and(col: str, start: Optional[Date], end: Optional[Date]) -> str:
     """Same as _date_filter but uses AND prefix for queries with an existing WHERE."""
     parts = []
     if start:
-        parts.append(f"{col} >= '{start}'")
+        parts.append(f"{col} >= '{start.isoformat()}'")
     if end:
-        parts.append(f"{col} <= '{end}'")
+        parts.append(f"{col} <= '{end.isoformat()}'")
     return ("AND " + " AND ".join(parts)) if parts else ""
 
 
 @router.get("/sales-summary")
 def sales_summary(
-    start_date: Optional[str] = Query(default=None, description="Filter from date YYYY-MM-DD"),
-    end_date: Optional[str] = Query(default=None, description="Filter to date YYYY-MM-DD"),
+    start_date: Optional[Date] = Query(default=None, description="Filter from date YYYY-MM-DD"),
+    end_date: Optional[Date] = Query(default=None, description="Filter to date YYYY-MM-DD"),
 ):
     """
     Returns aggregated KPIs from the sales database.

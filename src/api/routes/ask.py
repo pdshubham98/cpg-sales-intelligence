@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from src.insights.llm import ask_question, generate_insights, summarize_trends
 from src.ingestion.schema import get_connection
+from src.market.benchmarks import get_quarterly_revenue
 
 router = APIRouter(tags=["AI insights"])
 
@@ -17,8 +18,11 @@ def _get_summary_context() -> dict:
         ).fetchone()
 
         by_region = conn.execute("""
-            SELECT region_id, ROUND(SUM(revenue),2) AS revenue, COUNT(*) AS tx
-            FROM sales_transactions GROUP BY region_id ORDER BY revenue DESC
+            SELECT COALESCE(r.region_name, s.region_id) AS region_name,
+                   ROUND(SUM(s.revenue),2) AS revenue, COUNT(*) AS tx
+            FROM sales_transactions s
+            LEFT JOIN regions r ON s.region_id = r.region_id
+            GROUP BY s.region_id, r.region_name ORDER BY revenue DESC
         """).fetchall()
 
         by_category = conn.execute("""
@@ -33,12 +37,29 @@ def _get_summary_context() -> dict:
             FROM sales_transactions GROUP BY month ORDER BY month
         """).fetchall()
 
+    # Summarise industry benchmarks: latest quarter revenue per company
+    industry: list[dict] = []
+    try:
+        raw = get_quarterly_revenue()
+        seen: set[str] = set()
+        for rec in sorted(raw, key=lambda r: r["quarter"], reverse=True):
+            if rec["ticker"] not in seen:
+                industry.append({
+                    "company": rec["company"],
+                    "quarter": rec["quarter"],
+                    "revenue_usd_m": rec["revenue_m"],
+                })
+                seen.add(rec["ticker"])
+    except Exception:
+        pass  # market data is best-effort; don't fail the whole context
+
     return {
         "total_revenue": total[0],
         "total_transactions": total[1],
         "by_region": [dict(r) for r in by_region],
         "by_category": [dict(r) for r in by_category],
         "monthly_trend": [dict(r) for r in monthly],
+        "industry_benchmarks": industry,
     }
 
 

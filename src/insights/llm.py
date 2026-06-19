@@ -11,31 +11,50 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_PROVIDER = os.getenv("LLM_PROVIDER", "groq").strip().lower()
 _GROQ_MODEL = "llama-3.3-70b-versatile"
 _GEMINI_MODEL = "gemini-1.5-flash"
+
+_groq_client = None
+_gemini_client = None
+
+
+def _get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY", "")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY environment variable is not set.")
+        from groq import Groq  # type: ignore
+        _groq_client = Groq(api_key=api_key)
+    return _groq_client
+
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is not set.")
+        from google import genai  # type: ignore
+        _gemini_client = genai.Client(api_key=api_key)
+    return _gemini_client
 
 
 def _call_llm(prompt: str) -> str:
     """Route to Groq or Gemini based on LLM_PROVIDER env var."""
-    if _PROVIDER == "groq":
+    provider = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+    if provider == "groq":
         return _call_groq(prompt)
-    elif _PROVIDER == "gemini":
+    elif provider == "gemini":
         return _call_gemini(prompt)
     else:
         raise ValueError(
-            f"Unknown LLM_PROVIDER='{_PROVIDER}'. Must be 'groq' or 'gemini'."
+            f"Unknown LLM_PROVIDER='{provider}'. Must be 'groq' or 'gemini'."
         )
 
 
 def _call_groq(prompt: str) -> str:
-    api_key = os.getenv("GROQ_API_KEY", "")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is not set.")
-
-    from groq import Groq  # type: ignore
-
-    client = Groq(api_key=api_key)
+    client = _get_groq_client()
     response = client.chat.completions.create(
         model=_GROQ_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -46,14 +65,9 @@ def _call_groq(prompt: str) -> str:
 
 
 def _call_gemini(prompt: str) -> str:
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set.")
-
-    from google import genai  # type: ignore
     from google.genai import types  # type: ignore
 
-    client = genai.Client(api_key=api_key)
+    client = _get_gemini_client()
     response = client.models.generate_content(
         model=_GEMINI_MODEL,
         contents=prompt,

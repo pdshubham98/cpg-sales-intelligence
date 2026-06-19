@@ -117,7 +117,7 @@ def _session_label(session: dict) -> str:
 # ── Sidebar navigation ───────────────────────────────────────────────────────
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Forecasting", "Ask Data", "AI Insights"],
+    ["Overview", "Forecasting", "Sales Assistant", "AI Insights"],
     index=0,
 )
 
@@ -146,8 +146,8 @@ if page == "Overview":
                 st.session_state.ov_end = _dt.date(2025, 12, 31)
                 st.rerun()
     _params = {
-        "start_date": str(_start) if "_start" in dir() else None,
-        "end_date": str(_end) if "_end" in dir() else None,
+        "start_date": str(_start),
+        "end_date": str(_end),
     }
 
     data = _get("/sales-summary", params=_params)
@@ -169,10 +169,12 @@ if page == "Overview":
     col1.metric(
         "Total Revenue", f"${data['total_revenue']:,.2f}",
         delta=f"{_rev_pct:+.1f}% MoM {_mom_label}" if _rev_pct is not None else None,
+        help="MoM delta always reflects the two most recent months across the full dataset",
     )
     col2.metric(
         "Total Transactions", f"{data['total_transactions']:,}",
         delta=f"{_tx_pct:+.1f}% MoM {_mom_label}" if _tx_pct is not None else None,
+        help="MoM delta always reflects the two most recent months across the full dataset",
     )
     avg = (
         data["total_revenue"] / data["total_transactions"]
@@ -385,8 +387,8 @@ elif page == "Forecasting":
         else:
             st.warning("No forecast results returned.")
 
-# ── Page: Ask Data (Multi-session chat) ───────────────────────────────────────
-elif page == "Ask Data":
+# ── Page: Sales Assistant (Multi-session chat) ────────────────────────────────
+elif page == "Sales Assistant":
     _init_sessions()
 
     # Sidebar — conversation session list
@@ -394,8 +396,13 @@ elif page == "Ask Data":
     st.sidebar.markdown("**Conversations**")
 
     if st.sidebar.button("＋ New Chat", use_container_width=True):
-        _create_session()
-        st.rerun()
+        # Only create a new session if the current one already has messages
+        _active = st.session_state.chat_sessions.get(
+            st.session_state.active_session_id, {}
+        )
+        if _active.get("history"):
+            _create_session()
+            st.rerun()
 
     for sid, session in list(st.session_state.chat_sessions.items()):
         is_active = sid == st.session_state.active_session_id
@@ -420,10 +427,8 @@ elif page == "Ask Data":
     session = st.session_state.chat_sessions[active_sid]
     history = session["history"]
 
-    st.title("Ask Data")
-    st.caption(
-        "Chat with your sales data. Each conversation in the sidebar is independent."
-    )
+    st.title("Sales Assistant")
+    st.caption("Ask anything about your sales data — revenue, trends, products, regions.")
 
     # Render existing messages
     for msg in history:
@@ -442,15 +447,20 @@ elif page == "Ask Data":
     ]
     _quick_fire: str | None = None
     if not history:
-        st.markdown("**Try asking:**")
-        _cols = st.columns(len(_SUGGESTED))
-        for _col, _q in zip(_cols, _SUGGESTED):
-            with _col:
-                if st.button(_q, use_container_width=True, key=f"suggest_{_q[:20]}"):
+        st.markdown("#### What would you like to know?")
+        _cols = st.columns(2)
+        for i, _q in enumerate(_SUGGESTED):
+            with _cols[i % 2]:
+                if st.button(
+                    _q,
+                    use_container_width=True,
+                    key=f"suggest_{_q[:20]}",
+                    type="secondary",
+                ):
                     _quick_fire = _q
 
     # Chat input — sticks to the bottom
-    user_input = st.chat_input("Ask a question about your sales data…") or _quick_fire
+    user_input = st.chat_input("Message Sales Assistant…") or _quick_fire
 
     if user_input and user_input.strip():
         with st.chat_message("user"):
@@ -533,4 +543,4 @@ elif page == "AI Insights":
 
 # ── Sidebar footer ────────────────────────────────────────────────────────────
 st.sidebar.markdown("---")
-st.sidebar.caption("CPG Sales Intelligence v3.0")
+st.sidebar.caption("CPG Sales Intelligence v3.1")

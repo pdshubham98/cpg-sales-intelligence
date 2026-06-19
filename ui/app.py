@@ -159,18 +159,33 @@ elif page == "Forecasting":
     st.title("Revenue Forecasting")
     st.caption("Linear regression on historical monthly data. CV R² shown where available.")
 
+    # Load valid dimension values for the dropdowns
+    _summary = _get("/sales-summary")
+    _region_options = {
+        r["region_name"]: r["region_id"]
+        for r in _summary.get("by_region", [])
+    }
+    _category_options = [c["category"] for c in _summary.get("by_category", [])]
+
     col1, col2, col3 = st.columns(3)
     with col1:
         dim_type = st.selectbox("Forecast by", ["region", "category"])
     with col2:
-        dim_val = st.text_input("Specific value (leave blank for all)", value="")
+        if dim_type == "region":
+            _region_choices = ["All regions"] + list(_region_options.keys())
+            _sel_region = st.selectbox("Region", _region_choices)
+            dim_val = None if _sel_region == "All regions" else _region_options[_sel_region]
+        else:
+            _cat_choices = ["All categories"] + _category_options
+            _sel_cat = st.selectbox("Category", _cat_choices)
+            dim_val = None if _sel_cat == "All categories" else _sel_cat
     with col3:
         periods = st.slider("Months ahead", 1, 12, 3)
 
     if st.button("Run Forecast", type="primary"):
         payload = {
             "dimension_type": dim_type,
-            "dimension_value": dim_val.strip() or None,
+            "dimension_value": dim_val,
             "periods": periods,
         }
         results = _post("/forecast", payload)
@@ -184,6 +199,7 @@ elif page == "Forecasting":
                         df, x="month", y="revenue",
                         labels={"month": "Month", "revenue": "Predicted Revenue ($)"},
                         color_discrete_sequence=["#2563EB"],
+                        text_auto=".2s",
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:

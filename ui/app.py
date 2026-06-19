@@ -22,13 +22,22 @@ st.set_page_config(
 )
 
 
-def _get(endpoint: str) -> dict:
+def _get(endpoint: str, params: dict | None = None) -> dict:
     try:
-        resp = requests.get(f"{API_BASE}{endpoint}", timeout=10)
+        resp = requests.get(f"{API_BASE}{endpoint}", params=params, timeout=10)
         resp.raise_for_status()
         return resp.json()
+    except requests.exceptions.ConnectionError:
+        st.error(
+            f"Cannot reach the API at `{API_BASE}`. "
+            "Make sure the backend is running and reload the page."
+        )
+        return {}
+    except requests.exceptions.Timeout:
+        st.error("The API took too long to respond. Please try again in a moment.")
+        return {}
     except Exception as exc:
-        st.error(f"API error: {exc}")
+        st.error(f"Unexpected API error: {exc}")
         return {}
 
 
@@ -37,8 +46,17 @@ def _post(endpoint: str, payload: dict) -> dict:
         resp = requests.post(f"{API_BASE}{endpoint}", json=payload, timeout=30)
         resp.raise_for_status()
         return resp.json()
+    except requests.exceptions.ConnectionError:
+        st.error(
+            f"Cannot reach the API at `{API_BASE}`. "
+            "Make sure the backend is running and reload the page."
+        )
+        return {}
+    except requests.exceptions.Timeout:
+        st.error("The API took too long to respond. Please try again in a moment.")
+        return {}
     except Exception as exc:
-        st.error(f"API error: {exc}")
+        st.error(f"Unexpected API error: {exc}")
         return {}
 
 
@@ -108,6 +126,10 @@ if page == "Overview":
     st.title("Sales Overview")
     data = _get("/sales-summary")
     if not data:
+        st.warning(
+            "No data available. The API may still be starting up — "
+            "wait a few seconds and reload the page."
+        )
         st.stop()
 
     mom = data.get("mom_delta", {})

@@ -152,7 +152,22 @@ if page == "Overview":
             df_channel, x="channel", y="revenue",
             color="channel",
             labels={"channel": "Channel", "revenue": "Revenue ($)"},
+            text_auto=".2s",
         )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("Top Products by Revenue")
+    df_prod = pd.DataFrame(data.get("by_product", []))
+    if not df_prod.empty:
+        fig = px.bar(
+            df_prod.head(10), x="revenue", y="product_name",
+            orientation="h",
+            color="category",
+            labels={"revenue": "Revenue ($)", "product_name": "Product", "category": "Category"},
+            text_auto=".2s",
+        )
+        fig.update_layout(yaxis=dict(autorange="reversed"), height=380)
         st.plotly_chart(fig, use_container_width=True)
 
 # ── Page: Forecasting ─────────────────────────────────────────────────────────

@@ -63,6 +63,17 @@ def sales_summary():
                 ORDER BY month
             """).fetchall()
 
+            by_product = conn.execute("""
+                SELECT p.product_name, p.sku, p.category,
+                       ROUND(SUM(s.revenue), 2)     AS revenue,
+                       COUNT(*)                      AS transactions,
+                       CAST(SUM(s.quantity) AS INT)  AS units_sold
+                FROM sales_transactions s
+                JOIN products p ON s.product_id = p.product_id
+                GROUP BY p.product_id, p.product_name, p.sku, p.category
+                ORDER BY revenue DESC
+            """).fetchall()
+
         return {
             "total_revenue": round(total[0] or 0.0, 2),
             "total_transactions": total[1] or 0,
@@ -70,6 +81,7 @@ def sales_summary():
             "by_category": [dict(r) for r in by_category],
             "by_channel": [dict(r) for r in by_channel],
             "monthly_trend": [dict(r) for r in monthly],
+            "by_product": [dict(r) for r in by_product],
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

@@ -384,30 +384,55 @@ elif page == "Ask Data":
 # ── Page: AI Insights ─────────────────────────────────────────────────────────
 elif page == "AI Insights":
     st.title("AI Insights")
+    st.caption(
+        "AI-generated analysis of your current sales data. Results are cached for this session."
+    )
 
-    col_a, col_b = st.columns(2)
+    _INSIGHT_ICONS = ["🔍", "📈", "🎯", "💡", "⚡"]
 
-    with col_a:
-        st.subheader("Trend Summary")
-        if st.button("Generate Trend Summary"):
-            with st.spinner("Analysing trends..."):
-                result = _get("/trends")
-            if result and "summary" in result:
-                st.info(result["summary"])
-            else:
-                st.error("Could not generate summary. Check your LLM API key.")
+    col_gen, col_clear = st.columns([3, 1])
+    with col_gen:
+        _generate = st.button("Generate All Insights", type="primary", use_container_width=True)
+    with col_clear:
+        if st.button("Clear cache", use_container_width=True):
+            st.session_state.pop("insights_cache", None)
+            st.rerun()
 
-    with col_b:
-        st.subheader("Business Insights")
-        if st.button("Generate Insights"):
-            with st.spinner("Generating insights..."):
-                result = _post("/insights", {})
-            if result and "insights" in result:
-                for i, insight in enumerate(result["insights"], 1):
-                    st.markdown(f"**{i}.** {insight}")
-            else:
-                st.error("Could not generate insights. Check your LLM API key.")
+    if _generate:
+        with st.spinner("Generating insights and trend summary…"):
+            _trend_res = _get("/trends")
+            _insights_res = _post("/insights", {})
+        if _trend_res or _insights_res:
+            st.session_state.insights_cache = {
+                "trend": _trend_res.get("summary", ""),
+                "insights": _insights_res.get("insights", []),
+            }
+        else:
+            st.error("Could not generate insights. Check your LLM API key.")
+
+    _cache = st.session_state.get("insights_cache")
+    if _cache:
+        st.markdown("---")
+
+        # Trend summary block
+        if _cache.get("trend"):
+            st.subheader("Trend Summary")
+            st.info(_cache["trend"])
+            st.markdown("")
+
+        # Insight cards
+        if _cache.get("insights"):
+            st.subheader("Business Insights")
+            for i, insight in enumerate(_cache["insights"]):
+                icon = _INSIGHT_ICONS[i % len(_INSIGHT_ICONS)]
+                with st.container(border=True):
+                    st.markdown(f"{icon} &nbsp; {insight}")
+    else:
+        st.markdown(
+            "> Click **Generate All Insights** to get an AI-powered trend analysis "
+            "and 5 actionable business insights from your current sales data."
+        )
 
 # ── Sidebar footer ────────────────────────────────────────────────────────────
 st.sidebar.markdown("---")
-st.sidebar.caption("CPG Sales Intelligence v2.0")
+st.sidebar.caption("CPG Sales Intelligence v3.0")

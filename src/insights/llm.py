@@ -103,16 +103,18 @@ def ask_question(
             lines.append(f"{prefix}: {msg['content']}")
         history_block = "\nConversation so far:\n" + "\n".join(lines) + "\n"
 
-    prompt = f"""You are a CPG sales data analyst assistant. Answer the following
-question using only the provided sales data context. Be concise and specific.
-If the question references something from the conversation history, use that context.
-{history_block}
-Sales Data Context:
-{context}
-
-Question: {question}
-
-Answer:"""
+    prompt = (
+        "You are a CPG sales data analyst assistant. "
+        "Answer the following question using only the provided sales data context.\n\n"
+        "Formatting rules:\n"
+        "- Use bullet points or numbered lists when presenting multiple items or data points\n"
+        "- Write currency as plain dollar amounts (e.g. $2,878.20)\n"
+        "- Use clear, plain English — no LaTeX or math notation\n"
+        "- Keep your answer concise and well-structured\n"
+        f"{history_block}\n"
+        f"Sales Data Context:\n{context}\n\n"
+        f"Question: {question}\n\nAnswer:"
+    )
     return _call_llm(prompt)
 
 

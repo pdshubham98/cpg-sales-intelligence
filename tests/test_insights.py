@@ -19,18 +19,18 @@ MOCK_SUMMARY = {
 
 class TestProviderRouting:
     def test_defaults_to_groq(self):
+        import src.insights.llm as llm_module
         with patch.dict(os.environ, {"LLM_PROVIDER": "groq", "GROQ_API_KEY": "test"}):
-            import importlib
-            import src.insights.llm as llm_module
-            importlib.reload(llm_module)
-            assert llm_module._PROVIDER == "groq"
+            with patch.object(llm_module, "_call_groq", return_value="ok") as mock_groq:
+                llm_module._call_llm("test")
+                mock_groq.assert_called_once()
 
     def test_switches_to_gemini(self):
+        import src.insights.llm as llm_module
         with patch.dict(os.environ, {"LLM_PROVIDER": "gemini", "GEMINI_API_KEY": "test"}):
-            import importlib
-            import src.insights.llm as llm_module
-            importlib.reload(llm_module)
-            assert llm_module._PROVIDER == "gemini"
+            with patch.object(llm_module, "_call_gemini", return_value="ok") as mock_gemini:
+                llm_module._call_llm("test")
+                mock_gemini.assert_called_once()
 
     def test_unknown_provider_raises(self):
         with patch.dict(os.environ, {"LLM_PROVIDER": "unknown"}):

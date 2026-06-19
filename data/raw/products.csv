@@ -1,0 +1,16 @@
+product_id,sku,product_name,category,unit_price
+P001,BEV-001,Sparkling Water 500ml,Beverages,1.99
+P002,BEV-002,Orange Juice 1L,Beverages,3.49
+P003,BEV-003,Energy Drink 250ml,Beverages,2.79
+P004,SNK-001,Potato Chips 150g,Snacks,2.29
+P005,SNK-002,Granola Bar 45g,Snacks,1.49
+P006,SNK-003,Popcorn 100g,Snacks,1.89
+P007,DRY-001,Pasta 500g,Dry Goods,1.29
+P008,DRY-002,Rice 1kg,Dry Goods,2.19
+P009,DRY-003,Oats 750g,Dry Goods,3.09
+P010,DRY-004,Flour 1kg,Dry Goods,1.59
+P011,CHI-001,Cheddar Cheese 200g,Chilled,4.99
+P012,CHI-002,Greek Yogurt 500g,Chilled,2.89
+P013,CHI-003,Butter 250g,Chilled,3.79
+P014,HPC-001,Shampoo 300ml,HPC,5.49
+P015,HPC-002,Body Wash 250ml,HPC,4.29

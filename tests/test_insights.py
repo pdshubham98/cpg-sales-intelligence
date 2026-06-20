@@ -91,6 +91,36 @@ class TestAskQuestion:
             assert "What is revenue?" in prompt
 
 
+class TestAutoFallback:
+    def test_falls_back_to_gemini_when_groq_fails(self):
+        import src.insights.llm as llm_module
+        env = {
+            "LLM_PROVIDER": "groq",
+            "GROQ_API_KEY": "test",
+            "GEMINI_API_KEY": "test",
+        }
+        with patch.dict(os.environ, env):
+            with patch.object(
+                llm_module, "_call_groq", side_effect=RuntimeError("rate limit")
+            ):
+                with patch.object(
+                    llm_module, "_call_gemini", return_value="fallback answer"
+                ) as mock_gemini:
+                    result = llm_module._call_llm("test prompt")
+                    assert result == "fallback answer"
+                    mock_gemini.assert_called_once()
+
+    def test_does_not_fallback_without_gemini_key(self):
+        import src.insights.llm as llm_module
+        env = {"LLM_PROVIDER": "groq", "GROQ_API_KEY": "test", "GEMINI_API_KEY": ""}
+        with patch.dict(os.environ, env):
+            with patch.object(
+                llm_module, "_call_groq", side_effect=RuntimeError("rate limit")
+            ):
+                with pytest.raises(RuntimeError):
+                    llm_module._call_llm("test prompt")
+
+
 class TestGenerateInsights:
     def test_returns_list(self):
         raw = (

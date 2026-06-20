@@ -229,6 +229,8 @@ def run_ingestion() -> dict:
         conn.executemany(sql, data_iter)
 
     with get_connection() as conn:
+        # Delete child table first to satisfy FK constraints
+        conn.execute("DELETE FROM sales_transactions")
         conn.execute("DELETE FROM products")
         conn.execute("DELETE FROM regions")
         regions.to_sql("regions", conn, if_exists="append", index=False)

@@ -93,5 +93,5 @@ def api_client(tmp_path):
     with patch.dict(os.environ, env):
         with patch("src.ingestion.loader.run_ingestion"):
             from src.api.main import app
-            with TestClient(app, raise_server_exceptions=False) as client:
+            with TestClient(app, raise_server_exceptions=True) as client:
                 yield client

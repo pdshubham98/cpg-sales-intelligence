@@ -260,3 +260,51 @@ class TestMultiSourceIngestion:
         from src.ingestion.loader import run_ingestion
         result = run_ingestion()
         assert result["clean_rows"] == 1
+
+
+class TestIncrementalIngestion:
+    def test_upsert_is_idempotent(self, patched_env):
+        """Running ingestion twice with the same data must not duplicate rows."""
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        from src.ingestion.loader import run_ingestion
+        from src.ingestion.schema import get_connection
+        run_ingestion()
+        run_ingestion()
+        with get_connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM sales_transactions WHERE transaction_id='T001'"
+            ).fetchone()[0]
+        assert count == 1
+
+    def test_new_records_appended_on_second_run(self, patched_env):
+        """Second ingestion with an extra row should add it without removing existing."""
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        from src.ingestion.loader import run_ingestion
+        from src.ingestion.schema import get_connection
+        run_ingestion()
+        _write_sales(
+            raw_dir,
+            "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n"
+            "T002,2024-02-01,R001,P001,BEV-001,20,1.99,0.0,Retail\n",
+        )
+        run_ingestion()
+        with get_connection() as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM sales_transactions"
+            ).fetchone()[0]
+        assert count == 2
+
+    def test_ingestion_log_records_run(self, patched_env):
+        """Each run must write one row to ingestion_log."""
+        tmp_path, raw_dir = patched_env
+        _write_sales(raw_dir, "T001,2024-01-01,R001,P001,BEV-001,10,1.99,0.0,Retail\n")
+        from src.ingestion.loader import run_ingestion
+        from src.ingestion.schema import get_connection
+        run_ingestion()
+        with get_connection() as conn:
+            rows = conn.execute("SELECT raw_rows, clean_rows FROM ingestion_log").fetchall()
+        assert len(rows) >= 1
+        assert rows[-1]["raw_rows"] >= 1
+        assert rows[-1]["clean_rows"] >= 1

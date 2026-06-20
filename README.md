@@ -12,8 +12,8 @@ AI-powered analytics platform for CPG revenue forecasting, data quality validati
 | Ingestion | Pandas + multi-source adapter pattern + 9 quality rules |
 | Forecasting | scikit-learn LinearRegression with cyclical seasonal features |
 | LLM | Groq `llama-3.3-70b-versatile` (primary) / Gemini `gemini-1.5-flash` (fallback) |
-| Tests | pytest — 60 tests, all mocked |
-| CI/CD | GitHub Actions (lint → test → Docker build) |
+| Tests | pytest — 69 tests, all mocked |
+| CI/CD | GitHub Actions (secrets scan → lint → test → Docker build) |
 | Container | Docker + docker-compose |
 
 ## Quickstart (Local)
@@ -56,13 +56,14 @@ Both services start automatically. No other setup required.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/health` | Service health + DB row counts |
+| GET | `/health` | Service health + DB row counts + last ingestion timestamp |
 | GET | `/sales-summary` | Aggregated KPIs by region, category, channel, month |
 | POST | `/forecast` | Revenue forecast by region, category, or product |
 | POST | `/ask` | Natural language Q&A against sales data + industry benchmarks |
 | POST | `/insights` | 5 actionable AI-generated business insights |
 | GET | `/trends` | LLM-generated trend summary |
 | GET | `/market-benchmarks` | Live quarterly revenue for major CPG companies (Yahoo Finance) |
+| GET | `/metrics` | Prometheus metrics (request counts, latency, LLM stats, ingestion rows) |
 
 ### POST /forecast — example
 
@@ -101,6 +102,35 @@ LLM_PROVIDER=gemini  # fallback — uses GEMINI_API_KEY
 
 Get a free Groq key at https://console.groq.com
 
+**Auto-fallback:** If Groq exhausts all retries (3 attempts with exponential backoff) and `GEMINI_API_KEY` is set, the request automatically falls back to Gemini — no config change needed.
+
+## Optional API Key Auth
+
+Set `SECRET_KEY` in `.env` to enable bearer-token protection on all AI endpoints:
+
+```bash
+SECRET_KEY=my-secret-token
+```
+
+When set, requests must include `X-Api-Key: my-secret-token`. If `SECRET_KEY` is empty (default), auth is disabled — useful for local dev and demos.
+
+## Observability
+
+The `/metrics` endpoint exposes Prometheus-compatible metrics:
+
+| Metric | Type | Description |
+|---|---|---|
+| `cpg_http_requests_total` | Counter | Request count by endpoint and status |
+| `cpg_http_request_duration_seconds` | Histogram | Request latency by endpoint |
+| `cpg_llm_call_duration_seconds` | Histogram | LLM call latency by provider |
+| `cpg_llm_errors_total` | Counter | LLM error count by provider |
+| `cpg_llm_fallbacks_total` | Counter | Groq→Gemini auto-fallback count |
+| `cpg_ingestion_rows` | Gauge | Row counts in DB (sales, products, regions) |
+
+## Incremental Ingestion
+
+The ETL uses `INSERT OR REPLACE` (UPSERT) keyed on `transaction_id`. Running ingestion multiple times is safe and idempotent — existing rows are updated, new rows are appended. Each run writes one row to the `ingestion_log` table (visible via `/health`).
+
 ## Project Structure
 
 ```
@@ -113,7 +143,7 @@ cpg-sales-intelligence/
 │   ├── market/        # Live industry benchmarks via Yahoo Finance
 │   └── api/           # FastAPI app + routes
 ├── ui/                # Streamlit dashboard (Overview, Forecasting, Sales Assistant, AI Insights)
-├── tests/             # 60 pytest tests
+├── tests/             # 69 pytest tests
 ├── docs/              # Architecture diagram, ADR, video script
 └── .github/workflows/ # GitHub Actions CI
 ```

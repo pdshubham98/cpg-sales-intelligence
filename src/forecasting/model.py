@@ -12,7 +12,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import TimeSeriesSplit
 
 from src.ingestion.schema import get_connection
 
@@ -117,12 +117,18 @@ def _forecast_one(
     model = LinearRegression()
     model.fit(X, y)
 
-    # Cross-validated R² only when there are enough samples
+    # Cross-validated R² using time-ordered splits to prevent future leakage
     r2_cv: float | None = None
     if len(X) >= min_cv_samples:
-        scores = cross_val_score(model, X, y, cv=min(3, len(X)), scoring="r2")
-        finite = scores[np.isfinite(scores)]
-        r2_cv = float(finite.mean()) if len(finite) > 0 else None
+        tscv = TimeSeriesSplit(n_splits=min(3, len(X) - 1))
+        scores = []
+        for train_idx, test_idx in tscv.split(X):
+            m = LinearRegression().fit(X[train_idx], y[train_idx])
+            ss_res = ((y[test_idx] - m.predict(X[test_idx])) ** 2).sum()
+            ss_tot = ((y[test_idx] - y[test_idx].mean()) ** 2).sum()
+            scores.append(1 - ss_res / ss_tot if ss_tot > 0 else 0.0)
+        finite = [s for s in scores if np.isfinite(s)]
+        r2_cv = float(np.mean(finite)) if finite else None
 
     # Predict future months
     last_period = int(group["period_index"].max())

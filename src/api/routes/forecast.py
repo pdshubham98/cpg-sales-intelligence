@@ -1,3 +1,4 @@
+import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 from src.forecasting.model import forecast, ForecastResult
 
 router = APIRouter(tags=["forecasting"])
+logger = logging.getLogger(__name__)
 
 
 class ForecastRequest(BaseModel):
@@ -55,7 +57,8 @@ def run_forecast(req: ForecastRequest):
             periods=req.periods,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error in /forecast: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     if not results:
         raise HTTPException(status_code=404, detail="No data found for the given parameters.")

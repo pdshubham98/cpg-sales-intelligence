@@ -1,9 +1,9 @@
 """
 Streamlit dashboard — 4 pages:
-  1. Overview      — KPI cards + revenue charts
-  2. Forecasting   — region/category revenue forecast
-  3. Ask Data      — multi-session natural language chat
-  4. AI Insights   — generated business insights + trend summary
+  1. Overview        — KPI cards + revenue charts
+  2. Forecasting     — region/category revenue forecast
+  3. Sales Assistant — multi-session natural language chat
+  4. AI Insights     — generated business insights + trend summary
 """
 import time
 import os

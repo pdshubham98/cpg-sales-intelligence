@@ -319,6 +319,7 @@ elif page == "Forecasting":
         r["region_name"]: r["region_id"]
         for r in _summary.get("by_region", [])
     }
+    _region_id_to_name = {v: k for k, v in _region_options.items()}
     _category_options = [c["category"] for c in _summary.get("by_category", [])]
 
     _product_options = [p["product_name"] for p in _summary.get("by_product", [])]
@@ -351,7 +352,12 @@ elif page == "Forecasting":
         results = _post("/forecast", payload)
         if isinstance(results, list) and results:
             for result in results:
-                st.subheader(f"{result['dimension']} ({result['dimension_type']})")
+                _dim_label = (
+                    _region_id_to_name.get(result["dimension"], result["dimension"])
+                    if result["dimension_type"] == "region"
+                    else result["dimension"]
+                )
+                st.subheader(_dim_label)
                 r2 = result.get("r2_cv")
                 rmse = result.get("rmse")
                 mape = result.get("mape")

@@ -7,10 +7,11 @@ router = APIRouter(tags=["health"])
 @router.get("/health")
 def health_check():
     """
-    Returns service health and database row count.
+    Returns service health, database row counts, and last ingestion timestamp.
 
     Example response:
-    {"status": "ok", "db_rows": {"sales_transactions": 198, "products": 15, "regions": 5}}
+    {"status": "ok", "db_rows": {"sales_transactions": 239, ...},
+     "last_ingestion": "2026-06-20T06:00:00"}
     """
     try:
         with get_connection() as conn:
@@ -23,6 +24,9 @@ def health_check():
             region_rows = conn.execute(
                 "SELECT COUNT(*) FROM regions"
             ).fetchone()[0]
+            last_run = conn.execute(
+                "SELECT run_at FROM ingestion_log ORDER BY id DESC LIMIT 1"
+            ).fetchone()
         return {
             "status": "ok",
             "db_rows": {
@@ -30,6 +34,7 @@ def health_check():
                 "products": product_rows,
                 "regions": region_rows,
             },
+            "last_ingestion": last_run[0] if last_run else None,
         }
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}

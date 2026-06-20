@@ -136,3 +136,23 @@ class TestTrendsEndpoint:
         with patch("src.api.routes.ask.summarize_trends", side_effect=err):
             resp = api_client.get("/trends")
         assert resp.status_code == 503
+
+
+class TestMetricsEndpoint:
+    def test_returns_200(self, api_client):
+        resp = api_client.get("/metrics")
+        assert resp.status_code == 200
+
+    def test_content_type_is_prometheus(self, api_client):
+        resp = api_client.get("/metrics")
+        assert "text/plain" in resp.headers["content-type"]
+
+    def test_contains_request_counter(self, api_client):
+        # Hit an endpoint so the counter is non-zero
+        api_client.get("/health")
+        resp = api_client.get("/metrics")
+        assert "cpg_http_requests_total" in resp.text
+
+    def test_contains_ingestion_gauge(self, api_client):
+        resp = api_client.get("/metrics")
+        assert "cpg_ingestion_rows" in resp.text

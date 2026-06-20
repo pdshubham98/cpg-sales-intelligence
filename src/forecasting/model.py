@@ -136,9 +136,10 @@ def _forecast_one(
             rmse_scores.append(float(np.sqrt(((y_true - y_pred) ** 2).mean())))
             nonzero = y_true != 0
             if nonzero.any():
-                mape_scores.append(
-                    float(np.mean(np.abs((y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero])) * 100)
+                pct_errors = np.abs(
+                    (y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero]
                 )
+                mape_scores.append(float(np.mean(pct_errors) * 100))
         finite_r2 = [s for s in r2_scores if np.isfinite(s)]
         r2_cv = round(float(np.mean(finite_r2)), 3) if finite_r2 else None
         rmse = round(float(np.mean(rmse_scores)), 2) if rmse_scores else None

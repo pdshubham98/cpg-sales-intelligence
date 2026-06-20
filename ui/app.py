@@ -364,7 +364,10 @@ elif page == "Forecasting":
                     quality_parts.append(f"RMSE = ${rmse:,.2f}")
                 if mape is not None:
                     quality_parts.append(f"MAPE = {mape:.1f}%")
-                quality = "  |  ".join(quality_parts) if quality_parts else "Insufficient data for metrics"
+                quality = (
+                    "  |  ".join(quality_parts) if quality_parts
+                    else "Insufficient data for metrics"
+                )
                 st.caption(f"{result['model_note']}  |  {quality}")
 
                 hist = result.get("historical", [])

@@ -1,12 +1,13 @@
 import logging
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.forecasting.model import forecast, ForecastResult
 
-router = APIRouter(tags=["forecasting"])
+router = APIRouter(tags=["forecasting"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +35,8 @@ class ForecastResponse(BaseModel):
     predictions: list[dict]
     historical: list[dict]
     r2_cv: Optional[float]
+    rmse: Optional[float]
+    mape: Optional[float]
     model_note: str
 
 
@@ -71,6 +74,8 @@ def run_forecast(req: ForecastRequest):
             predictions=r.predictions,
             historical=r.historical,
             r2_cv=r.r2_cv,
+            rmse=r.rmse,
+            mape=r.mape,
             model_note=r.model_note,
         )
         for r in results

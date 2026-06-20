@@ -1,10 +1,11 @@
 import logging
 from typing import Optional
 from datetime import date as Date
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from src.api.auth import verify_api_key
 from src.ingestion.schema import get_connection
 
-router = APIRouter(tags=["analytics"])
+router = APIRouter(tags=["analytics"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
 
 

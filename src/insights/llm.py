@@ -5,11 +5,16 @@ Fallback: Gemini (gemini-1.5-flash) — controlled by LLM_PROVIDER env var.
 """
 from __future__ import annotations
 
+import json
 import os
+import time
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt
 
 _GROQ_MODEL = "llama-3.3-70b-versatile"
 _GEMINI_MODEL = "gemini-1.5-flash"
@@ -55,13 +60,27 @@ def _call_llm(prompt: str) -> str:
 
 def _call_groq(prompt: str) -> str:
     client = _get_groq_client()
-    response = client.chat.completions.create(
-        model=_GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-        max_tokens=1024,
-    )
-    return response.choices[0].message.content.strip()
+    last_exc: Exception | None = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            response = client.chat.completions.create(
+                model=_GROQ_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=1024,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as exc:
+            last_exc = exc
+            # Retry on rate limit or transient errors; bail immediately on auth errors
+            if "401" in str(exc) or "invalid_api_key" in str(exc).lower():
+                raise
+            delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
+            logger.warning("Groq call failed (attempt %d/%d): %s. Retrying in %.1fs",
+                           attempt, _MAX_RETRIES, exc, delay)
+            if attempt < _MAX_RETRIES:
+                time.sleep(delay)
+    raise RuntimeError(f"Groq failed after {_MAX_RETRIES} attempts") from last_exc
 
 
 def _call_gemini(prompt: str) -> str:
@@ -92,7 +111,7 @@ summary and provide a concise 3–5 sentence trend analysis. Focus on top-perfor
 regions, revenue growth patterns, and any notable anomalies.
 
 Sales Summary:
-{sales_summary}
+{json.dumps(sales_summary, indent=2, default=str)}
 
 Provide only the analysis, no preamble."""
     return _call_llm(prompt)
@@ -126,7 +145,7 @@ def ask_question(
         "- Use clear, plain English — no LaTeX or math notation\n"
         "- Keep your answer concise and well-structured\n"
         f"{history_block}\n"
-        f"Sales Data Context:\n{context}\n\n"
+        f"Sales Data Context:\n{json.dumps(context, indent=2, default=str)}\n\n"
         f"Question: {question}\n\nAnswer:"
     )
     return _call_llm(prompt)
@@ -143,7 +162,7 @@ sentence starting with an action verb (e.g., "Expand", "Reduce", "Invest", "Focu
 Return each insight on its own line, numbered 1–5.
 
 Sales Data:
-{sales_summary}
+{json.dumps(sales_summary, indent=2, default=str)}
 
 Insights:"""
     raw = _call_llm(prompt)

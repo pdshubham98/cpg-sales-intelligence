@@ -1,14 +1,15 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from src.api.auth import verify_api_key
 
 from src.insights.llm import ask_question, generate_insights, summarize_trends
 from src.ingestion.schema import get_connection
 from src.market.benchmarks import get_quarterly_revenue
 
-router = APIRouter(tags=["AI insights"])
+router = APIRouter(tags=["AI insights"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +72,7 @@ class ChatMessage(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    question: str = Field(max_length=2000, description="Natural language question (max 2000 chars)")
     history: Optional[list[ChatMessage]] = None
 
 

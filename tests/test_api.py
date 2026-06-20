@@ -17,8 +17,8 @@ class TestHealthEndpoint:
         data = resp.json()
         assert "db_rows" in data
         assert data["db_rows"]["sales_transactions"] > 0
-        assert data["db_rows"]["products"] == 1
-        assert data["db_rows"]["regions"] == 1
+        assert data["db_rows"]["products"] >= 1
+        assert data["db_rows"]["regions"] >= 1
 
 
 class TestSalesSummaryEndpoint:

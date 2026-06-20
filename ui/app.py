@@ -353,11 +353,18 @@ elif page == "Forecasting":
             for result in results:
                 st.subheader(f"{result['dimension']} ({result['dimension_type']})")
                 r2 = result.get("r2_cv")
-                quality = (
-                    f"Model fit: R² = {r2:.3f} "
-                    + ("(good)" if r2 and r2 >= 0.7 else "(low — interpret with caution)")
-                    if r2 is not None else "Model fit: insufficient data for R²"
-                )
+                rmse = result.get("rmse")
+                mape = result.get("mape")
+                quality_parts = []
+                if r2 is not None:
+                    quality_parts.append(
+                        f"R² = {r2:.3f} " + ("✓" if r2 >= 0.7 else "⚠ low")
+                    )
+                if rmse is not None:
+                    quality_parts.append(f"RMSE = ${rmse:,.2f}")
+                if mape is not None:
+                    quality_parts.append(f"MAPE = {mape:.1f}%")
+                quality = "  |  ".join(quality_parts) if quality_parts else "Insufficient data for metrics"
                 st.caption(f"{result['model_note']}  |  {quality}")
 
                 hist = result.get("historical", [])

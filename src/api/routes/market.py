@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from src.api.auth import verify_api_key
 from src.market.benchmarks import get_quarterly_revenue
 
-router = APIRouter(tags=["market intelligence"])
+router = APIRouter(tags=["market intelligence"], dependencies=[Depends(verify_api_key)])
 
 
 @router.get("/market-benchmarks")

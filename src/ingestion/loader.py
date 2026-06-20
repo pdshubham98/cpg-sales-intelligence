@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
+import json
+
 from src.ingestion.schema import create_schema, get_connection
 
 logger = logging.getLogger(__name__)
@@ -213,17 +215,33 @@ def run_ingestion() -> dict:
     clean_count = len(sales)
 
     # ── Write to DB in a single atomic transaction ────────────────────────────
-    # All CSV loading and quality rules run before any DB writes so that a
-    # failure during transform never leaves the database in a partially empty state.
+    # Reference tables (regions, products) are always fully reloaded — they are
+    # small and treated as authoritative source of truth.
+    # Sales transactions use INSERT OR REPLACE (UPSERT) keyed on transaction_id
+    # so re-running ingestion is idempotent and new records are appended without
+    # wiping existing data.
+    sales["source"] = sales["_source"]
+
+    def _upsert(table, conn, keys, data_iter):
+        cols = ", ".join(f'"{k}"' for k in keys)
+        placeholders = ", ".join(["?"] * len(keys))
+        sql = f"INSERT OR REPLACE INTO {table.name} ({cols}) VALUES ({placeholders})"
+        conn.executemany(sql, data_iter)
+
     with get_connection() as conn:
-        conn.execute("DELETE FROM sales_transactions")
         conn.execute("DELETE FROM products")
         conn.execute("DELETE FROM regions")
         regions.to_sql("regions", conn, if_exists="append", index=False)
         products.to_sql("products", conn, if_exists="append", index=False)
-        sales["source"] = sales["_source"]
         sales[_DB_COLS].to_sql(
-            "sales_transactions", conn, if_exists="append", index=False
+            "sales_transactions", conn, if_exists="append",
+            index=False, method=_upsert,
+        )
+        # Record this run in the ingestion log
+        conn.execute(
+            "INSERT INTO ingestion_log (raw_rows, clean_rows, dropped_rows, sources) "
+            "VALUES (?, ?, ?, ?)",
+            (raw_count, clean_count, raw_count - clean_count, json.dumps(source_stats)),
         )
     logger.info("Loaded %d regions, %d products", len(regions), len(products))
 

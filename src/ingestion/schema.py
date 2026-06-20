@@ -50,6 +50,16 @@ def create_schema() -> None:
             CREATE INDEX IF NOT EXISTS idx_sales_region   ON sales_transactions(region_id);
             CREATE INDEX IF NOT EXISTS idx_sales_product  ON sales_transactions(product_id);
         """)
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS ingestion_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S','now')),
+                raw_rows    INTEGER,
+                clean_rows  INTEGER,
+                dropped_rows INTEGER,
+                sources     TEXT
+            );
+        """)
         # Migrate: add source column if the table pre-dates this change
         existing = {row[1] for row in conn.execute("PRAGMA table_info(sales_transactions)")}
         if "source" not in existing:

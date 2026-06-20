@@ -13,6 +13,16 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+# Lazy import of metrics to avoid circular imports and allow tests without prometheus
+def _metrics():
+    try:
+        from src.api.metrics import LLM_LATENCY, LLM_ERRORS, LLM_FALLBACKS
+        return LLM_LATENCY, LLM_ERRORS, LLM_FALLBACKS
+    except Exception:
+        return None, None, None
+
+
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt
 
@@ -46,10 +56,26 @@ def _get_gemini_client():
 
 
 def _call_llm(prompt: str) -> str:
-    """Route to Groq or Gemini based on LLM_PROVIDER env var."""
+    """Route to Groq or Gemini based on LLM_PROVIDER env var.
+
+    If primary provider is Groq and all retries fail, automatically falls
+    back to Gemini when GEMINI_API_KEY is set — no manual intervention needed.
+    """
+    _, _, llm_fallbacks = _metrics()
     provider = os.getenv("LLM_PROVIDER", "groq").strip().lower()
     if provider == "groq":
-        return _call_groq(prompt)
+        try:
+            return _call_groq(prompt)
+        except Exception as exc:
+            gemini_key = os.getenv("GEMINI_API_KEY", "")
+            if gemini_key:
+                logger.warning(
+                    "Groq failed (%s) — falling back to Gemini automatically", exc
+                )
+                if llm_fallbacks:
+                    llm_fallbacks.inc()
+                return _call_gemini(prompt)
+            raise
     elif provider == "gemini":
         return _call_gemini(prompt)
     else:
@@ -60,8 +86,10 @@ def _call_llm(prompt: str) -> str:
 
 def _call_groq(prompt: str) -> str:
     client = _get_groq_client()
+    llm_latency, llm_errors, _ = _metrics()
     last_exc: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
+        t0 = time.time()
         try:
             response = client.chat.completions.create(
                 model=_GROQ_MODEL,
@@ -69,15 +97,21 @@ def _call_groq(prompt: str) -> str:
                 temperature=0.3,
                 max_tokens=1024,
             )
+            if llm_latency:
+                llm_latency.labels(provider="groq").observe(time.time() - t0)
             return response.choices[0].message.content.strip()
         except Exception as exc:
             last_exc = exc
-            # Retry on rate limit or transient errors; bail immediately on auth errors
+            if llm_errors:
+                llm_errors.labels(provider="groq").inc()
+            # Bail immediately on auth errors; retry on rate limit / transient
             if "401" in str(exc) or "invalid_api_key" in str(exc).lower():
                 raise
             delay = _RETRY_BASE_DELAY * (2 ** (attempt - 1))
-            logger.warning("Groq call failed (attempt %d/%d): %s. Retrying in %.1fs",
-                           attempt, _MAX_RETRIES, exc, delay)
+            logger.warning(
+                "Groq call failed (attempt %d/%d): %s. Retrying in %.1fs",
+                attempt, _MAX_RETRIES, exc, delay,
+            )
             if attempt < _MAX_RETRIES:
                 time.sleep(delay)
     raise RuntimeError(f"Groq failed after {_MAX_RETRIES} attempts") from last_exc

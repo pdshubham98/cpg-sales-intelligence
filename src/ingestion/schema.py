@@ -38,11 +38,12 @@ def create_schema() -> None:
                 region_id      TEXT NOT NULL REFERENCES regions(region_id),
                 product_id     TEXT NOT NULL REFERENCES products(product_id),
                 sku            TEXT NOT NULL,
-                quantity       INTEGER NOT NULL,
+                quantity       REAL NOT NULL,
                 unit_price     REAL NOT NULL,
                 discount_pct   REAL NOT NULL DEFAULT 0.0,
                 channel        TEXT NOT NULL,
-                revenue        REAL NOT NULL
+                revenue        REAL NOT NULL,
+                source         TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_sales_date     ON sales_transactions(date);

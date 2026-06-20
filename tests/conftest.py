@@ -17,33 +17,57 @@ os.environ.setdefault("GROQ_API_KEY", "test-key")
 
 
 def _seed_db(db_file: Path) -> None:
-    """Create schema and insert reference + transaction rows."""
+    """Create schema and insert reference + transaction rows.
+
+    Seeds 3 regions × 3 categories × 15 months so multi-dimension queries
+    (by_region, by_category, cross-region forecasting) are meaningfully tested.
+    """
     env = {"DB_PATH": str(db_file)}
     with patch.dict(os.environ, env):
         from src.ingestion.schema import create_schema, get_connection
         create_schema()
         with get_connection() as conn:
-            conn.execute(
-                "INSERT OR IGNORE INTO regions VALUES "
-                "('R001','North America','USA','Alice')"
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO products VALUES "
-                "('P001','BEV-001','Sparkling Water','Beverages',1.99)"
-            )
+            # 3 regions
+            for rid, rname, country, mgr in [
+                ("R001", "North America", "USA", "Alice"),
+                ("R002", "Europe", "UK", "Bob"),
+                ("R003", "Asia Pacific", "JP", "Carol"),
+            ]:
+                conn.execute(
+                    "INSERT OR IGNORE INTO regions VALUES (?,?,?,?)",
+                    (rid, rname, country, mgr),
+                )
+            # 3 products across 3 categories
+            for pid, sku, name, cat, price in [
+                ("P001", "BEV-001", "Sparkling Water", "Beverages", 1.99),
+                ("P002", "SNK-001", "Granola Bar", "Snacks", 2.49),
+                ("P003", "HPC-001", "Shampoo", "HPC", 5.99),
+            ]:
+                conn.execute(
+                    "INSERT OR IGNORE INTO products VALUES (?,?,?,?,?)",
+                    (pid, sku, name, cat, price),
+                )
+            # 15 months × 3 regions × 3 products = 135 transactions
+            tx = 1
             for i in range(1, 16):
                 month = (
                     f"2024-{i:02d}-15" if i <= 12 else f"2025-{(i - 12):02d}-15"
                 )
-                conn.execute(
-                    "INSERT OR IGNORE INTO sales_transactions VALUES "
-                    "(?,?,?,?,?,?,?,?,?,?)",
-                    (
-                        f"T{i:04d}", month, "R001", "P001", "BEV-001",
-                        100 + i * 5, 1.99, 0.05, "Retail",
-                        round((100 + i * 5) * 1.99 * 0.95, 2),
-                    ),
-                )
+                for rid in ("R001", "R002", "R003"):
+                    for pid, sku, price in [
+                        ("P001", "BEV-001", 1.99),
+                        ("P002", "SNK-001", 2.49),
+                        ("P003", "HPC-001", 5.99),
+                    ]:
+                        qty = 100 + tx * 2
+                        rev = round(qty * price * 0.95, 2)
+                        conn.execute(
+                            "INSERT OR IGNORE INTO sales_transactions "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                            (f"T{tx:04d}", month, rid, pid, sku,
+                             qty, price, 0.05, "Retail", rev, "POS"),
+                        )
+                        tx += 1
             conn.commit()
 
 

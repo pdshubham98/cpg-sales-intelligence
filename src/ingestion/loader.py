@@ -29,6 +29,8 @@ _CANONICAL = [
     "transaction_id", "date", "region_id", "product_id",
     "sku", "quantity", "unit_price", "discount_pct", "channel",
 ]
+# Columns written to DB (canonical + derived)
+_DB_COLS = _CANONICAL + ["revenue", "source"]
 
 # Quality rule labels
 _QR = {
@@ -104,18 +106,11 @@ def run_ingestion() -> dict:
     """
     create_schema()
 
-    # Reference tables (unchanged)
+    # ── Load all CSVs and adapt before touching the DB ────────────────────────
+    # All file I/O happens first so a missing CSV never leaves the DB empty.
     regions = _load_csv("regions")
     products = _load_csv("products")
-    with get_connection() as conn:
-        conn.execute("DELETE FROM sales_transactions")
-        conn.execute("DELETE FROM products")
-        conn.execute("DELETE FROM regions")
-        regions.to_sql("regions", conn, if_exists="append", index=False)
-        products.to_sql("products", conn, if_exists="append", index=False)
-    logger.info("Loaded %d regions, %d products", len(regions), len(products))
 
-    # ── Load and adapt all sources ────────────────────────────────────────────
     frames: list[pd.DataFrame] = []
     source_stats: dict[str, dict] = {}
     currency_conversions = 0
@@ -209,7 +204,7 @@ def run_ingestion() -> dict:
             (sales["_source"] == label).sum()
         )
 
-    # ── Derive revenue and write ──────────────────────────────────────────────
+    # ── Derive revenue ────────────────────────────────────────────────────────
     sales["discount_pct"] = pd.to_numeric(sales["discount_pct"], errors="coerce").fillna(0.0)
     sales["revenue"] = (
         sales["quantity"] * sales["unit_price"] * (1 - sales["discount_pct"])
@@ -217,11 +212,20 @@ def run_ingestion() -> dict:
 
     clean_count = len(sales)
 
+    # ── Write to DB in a single atomic transaction ────────────────────────────
+    # All CSV loading and quality rules run before any DB writes so that a
+    # failure during transform never leaves the database in a partially empty state.
     with get_connection() as conn:
         conn.execute("DELETE FROM sales_transactions")
-        sales[_CANONICAL + ["revenue"]].to_sql(
+        conn.execute("DELETE FROM products")
+        conn.execute("DELETE FROM regions")
+        regions.to_sql("regions", conn, if_exists="append", index=False)
+        products.to_sql("products", conn, if_exists="append", index=False)
+        sales["source"] = sales["_source"]
+        sales[_DB_COLS].to_sql(
             "sales_transactions", conn, if_exists="append", index=False
         )
+    logger.info("Loaded %d regions, %d products", len(regions), len(products))
 
     summary = {
         "raw_rows": raw_count,

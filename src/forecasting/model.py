@@ -25,6 +25,8 @@ class ForecastResult:
     predictions: list[dict]  # [{month: "YYYY-MM", revenue: float}]
     historical: list[dict]   # [{month: "YYYY-MM", revenue: float}]
     r2_cv: float | None
+    rmse: float | None
+    mape: float | None
     model_note: str
 
 
@@ -98,11 +100,11 @@ def _forecast_one(
     group: pd.DataFrame,
     periods_ahead: int,
     min_cv_samples: int = 3,
-) -> tuple[list[dict], list[dict], float | None]:
+) -> tuple[list[dict], list[dict], float | None, float | None, float | None]:
     """
     Fit LinearRegression on (period_index, month_sin, month_cos → revenue).
     Seasonal features capture within-year patterns; period_index captures trend.
-    Returns (predictions_list, historical_list, r2_cv).
+    Returns (predictions_list, historical_list, r2_cv, rmse, mape).
     """
     feature_cols = ["period_index", "month_sin", "month_cos"]
     X = group[feature_cols].values
@@ -117,18 +119,30 @@ def _forecast_one(
     model = LinearRegression()
     model.fit(X, y)
 
-    # Cross-validated R² using time-ordered splits to prevent future leakage
+    # Cross-validated metrics using time-ordered splits to prevent future leakage
     r2_cv: float | None = None
+    rmse: float | None = None
+    mape: float | None = None
     if len(X) >= min_cv_samples:
         tscv = TimeSeriesSplit(n_splits=min(3, len(X) - 1))
-        scores = []
+        r2_scores, rmse_scores, mape_scores = [], [], []
         for train_idx, test_idx in tscv.split(X):
             m = LinearRegression().fit(X[train_idx], y[train_idx])
-            ss_res = ((y[test_idx] - m.predict(X[test_idx])) ** 2).sum()
-            ss_tot = ((y[test_idx] - y[test_idx].mean()) ** 2).sum()
-            scores.append(1 - ss_res / ss_tot if ss_tot > 0 else 0.0)
-        finite = [s for s in scores if np.isfinite(s)]
-        r2_cv = float(np.mean(finite)) if finite else None
+            y_pred = m.predict(X[test_idx])
+            y_true = y[test_idx]
+            ss_res = ((y_true - y_pred) ** 2).sum()
+            ss_tot = ((y_true - y_true.mean()) ** 2).sum()
+            r2_scores.append(1 - ss_res / ss_tot if ss_tot > 0 else 0.0)
+            rmse_scores.append(float(np.sqrt(((y_true - y_pred) ** 2).mean())))
+            nonzero = y_true != 0
+            if nonzero.any():
+                mape_scores.append(
+                    float(np.mean(np.abs((y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero])) * 100)
+                )
+        finite_r2 = [s for s in r2_scores if np.isfinite(s)]
+        r2_cv = round(float(np.mean(finite_r2)), 3) if finite_r2 else None
+        rmse = round(float(np.mean(rmse_scores)), 2) if rmse_scores else None
+        mape = round(float(np.mean(mape_scores)), 1) if mape_scores else None
 
     # Predict future months
     last_period = int(group["period_index"].max())
@@ -150,7 +164,7 @@ def _forecast_one(
             }
         )
 
-    return predictions, historical, r2_cv
+    return predictions, historical, r2_cv, rmse, mape
 
 
 def forecast(
@@ -191,15 +205,21 @@ def forecast(
                     predictions=[],
                     historical=[],
                     r2_cv=None,
+                    rmse=None,
+                    mape=None,
                     model_note="Insufficient data (< 2 months)",
                 )
             )
             continue
 
-        predictions, historical, r2_cv = _forecast_one(group.copy(), periods)
+        predictions, historical, r2_cv, rmse, mape = _forecast_one(group.copy(), periods)
         note = f"Linear regression + seasonal features on {len(group)} monthly data points"
         if r2_cv is not None:
             note += f"; CV R²={r2_cv:.3f}"
+        if rmse is not None:
+            note += f"; RMSE={rmse:.2f}"
+        if mape is not None:
+            note += f"; MAPE={mape:.1f}%"
 
         results.append(
             ForecastResult(
@@ -209,6 +229,8 @@ def forecast(
                 predictions=predictions,
                 historical=historical,
                 r2_cv=r2_cv,
+                rmse=rmse,
+                mape=mape,
                 model_note=note,
             )
         )

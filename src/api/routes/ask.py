@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +9,7 @@ from src.ingestion.schema import get_connection
 from src.market.benchmarks import get_quarterly_revenue
 
 router = APIRouter(tags=["AI insights"])
+logger = logging.getLogger(__name__)
 
 
 def _get_summary_context() -> dict:
@@ -107,7 +109,8 @@ def ask_data(req: AskRequest):
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error in /ask: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/insights", response_model=InsightsResponse)
@@ -125,7 +128,8 @@ def get_insights():
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error in /insights: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/trends", response_model=TrendsResponse)
@@ -143,4 +147,5 @@ def get_trends():
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error in /trends: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")

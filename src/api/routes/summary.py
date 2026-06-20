@@ -1,9 +1,11 @@
+import logging
 from typing import Optional
 from datetime import date as Date
 from fastapi import APIRouter, HTTPException, Query
 from src.ingestion.schema import get_connection
 
 router = APIRouter(tags=["analytics"])
+logger = logging.getLogger(__name__)
 
 
 def _date_filter(col: str, start: Optional[Date], end: Optional[Date]) -> str:
@@ -158,4 +160,5 @@ def sales_summary(
             "discount_analysis": [dict(r) for r in discount],
         }
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error in /sales-summary: %s", exc)
+        raise HTTPException(status_code=500, detail="Internal server error")

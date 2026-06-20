@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="CPG Sales Intelligence API",
     description="AI-powered CPG sales analytics: forecasting, insights, and natural language Q&A.",
-    version="3.0.0",
+    version="3.1.0",
     lifespan=lifespan,
 )
 

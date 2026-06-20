@@ -50,3 +50,7 @@ def create_schema() -> None:
             CREATE INDEX IF NOT EXISTS idx_sales_region   ON sales_transactions(region_id);
             CREATE INDEX IF NOT EXISTS idx_sales_product  ON sales_transactions(product_id);
         """)
+        # Migrate: add source column if the table pre-dates this change
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(sales_transactions)")}
+        if "source" not in existing:
+            conn.execute("ALTER TABLE sales_transactions ADD COLUMN source TEXT")
